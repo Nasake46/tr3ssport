@@ -36,6 +36,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "427f8744-3a88-40b6-8fde-082ced93a3e8"
+      }
+    },
+    "owner": "nasake-org"
   }
 }
