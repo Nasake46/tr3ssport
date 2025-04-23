@@ -1,34 +1,56 @@
 import React, { useState } from 'react';
-import { TextInput, Button } from 'react-native';
-import auth from '@react-native-firebase/auth';  // Importation correcte
+import { TextInput, Button, StyleSheet, View, Alert } from 'react-native';
+import auth from '@react-native-firebase/auth';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const signIn = async () => {
+  const handleLogin = async () => {
     try {
-      await auth().signInWithEmailAndPassword(email, password); // Utilisation de la méthode signInWithEmailAndPassword de @react-native-firebase/auth
-      console.log('User signed in!');
+      const userCredential = await auth().signInWithEmailAndPassword(email, password);
+      console.log('Connexion réussie:', userCredential.user);
+      Alert.alert('Succès', 'Connexion réussie');
     } catch (error) {
-      console.error(error);
+      console.error('Erreur de connexion:', error);
+      Alert.alert('Erreur', 'Impossible de se connecter. Vérifiez vos identifiants.');
     }
   };
 
   return (
-    <>
+    <View style={styles.container}>
       <TextInput
+        style={styles.input}
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
       />
       <TextInput
-        placeholder="Password"
+        style={styles.input}
+        placeholder="Mot de passe"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button title="Sign In" onPress={signIn} />
-    </>
+      <Button title="Se connecter" onPress={handleLogin} />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  input: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    marginBottom: 12,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+});
