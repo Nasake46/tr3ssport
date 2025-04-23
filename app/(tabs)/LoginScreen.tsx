@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { TextInput, Button, StyleSheet, View, Alert } from 'react-native';
-import auth from '@react-native-firebase/auth';
+import { auth } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -8,7 +10,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     try {
-      const userCredential = await auth().signInWithEmailAndPassword(email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log('Connexion réussie:', userCredential.user);
       Alert.alert('Succès', 'Connexion réussie');
     } catch (error) {
