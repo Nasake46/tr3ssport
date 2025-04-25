@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import { TextInput, Text, TouchableOpacity, StyleSheet, View } from 'react-native';
+import { TextInput, Text, TouchableOpacity, StyleSheet, View, Alert } from 'react-native';
 
-export default function RegisterScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+export default function RegisterCoachScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [siretNumber, setSiretNumber] = useState('');
+  const [diploma, setDiploma] = useState('');
 
   const handleRegister = () => {
+    console.log('Prénom:', firstName);
+    console.log('Nom:', lastName);
     console.log('Email:', email);
-    console.log('Password:', password);
+    console.log('Téléphone:', phone);
+    console.log('Adresse:', address);
+    console.log('Nom de la société:', companyName);
+    console.log('Numéro de SIRET:', siretNumber);
+    console.log('Diplôme:', diploma);
+    Alert.alert('Succès', 'Inscription réussie');
   };
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.title}>Créer un compte</Text>
+      <Text style={styles.title}>Inscription Coach</Text>
       <View style={styles.form}>
         <Text style={styles.label}>Prénom</Text>
         <TextInput
@@ -45,23 +55,46 @@ export default function RegisterScreen() {
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Numéro de téléphone</Text>
+        <Text style={styles.label}>Téléphone</Text>
         <TextInput
           style={styles.input}
           placeholder="(+33) 06 -- -- -- --"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
+          value={phone}
+          onChangeText={setPhone}
           keyboardType="phone-pad"
-          autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Mot de passe</Text>
+        <Text style={styles.label}>Adresse</Text>
         <TextInput
           style={styles.input}
-          placeholder="Mot de passe"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
+          placeholder="Adresse"
+          value={address}
+          onChangeText={setAddress}
+        />
+
+        <Text style={styles.label}>Nom de la société</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nom de la société"
+          value={companyName}
+          onChangeText={setCompanyName}
+        />
+
+        <Text style={styles.label}>Numéro de SIRET</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Numéro de SIRET"
+          value={siretNumber}
+          onChangeText={setSiretNumber}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Diplôme</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Diplôme"
+          value={diploma}
+          onChangeText={setDiploma}
         />
 
         <TouchableOpacity style={styles.button} onPress={handleRegister}>
