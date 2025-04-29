@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { TextInput, Button, StyleSheet, View, Alert, Text } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase'; // Assurez-vous que le chemin vers votre fichier de configuration Firebase est correct
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, firestore } from '../../firebase';
+import { useRouter } from 'expo-router';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -10,6 +12,7 @@ export default function RegisterScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleRegister = async () => {
     if (!email || !password) {
@@ -18,13 +21,25 @@ export default function RegisterScreen() {
     }
 
     try {
+      // 1. Créer l'utilisateur dans Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      
+      // 2. Ajouter les informations supplémentaires dans Firestore avec le rôle "user"
+      await setDoc(doc(firestore, "users", user.uid), {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        role: "user", // Définir le rôle comme "user"
+        createdAt: new Date()
+      });
+      
       console.log('Utilisateur enregistré:', user);
-      // Ici, vous pouvez naviguer vers l'écran d'accueil ou un autre écran
-      // navigation.navigate('Home'); // Assurez-vous que 'navigation' est disponible si vous utilisez react-navigation
       Alert.alert('Succès', 'Votre compte a été créé avec succès !');
-      // Réinitialiser les champs après l'inscription (optionnel)
+      router.push('/(tabs)/LoginScreen');
+      
+      // Réinitialiser les champs après l'inscription
       setEmail('');
       setPassword('');
       setPhoneNumber('');
