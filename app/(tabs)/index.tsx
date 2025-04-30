@@ -8,6 +8,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
       <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
+      <Button title="Home" onPress={() => router.push('/(tabs)/HomeScreen')} />
     </View>
   );
 }
