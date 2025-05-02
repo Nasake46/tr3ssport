@@ -9,18 +9,19 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false); // Nouvel état pour suivre l'authentification
+  const [redirectPath, setRedirectPath] = useState<string | null>(null);
   const router = useRouter();
 
-  // Redirection automatique après authentification réussie
+  // Effet pour gérer la redirection
   useEffect(() => {
-    if (authenticated) {
-      // Utilisation de setTimeout pour laisser le temps à React de se mettre à jour
-      setTimeout(() => {
-        router.replace('/(tabs)');
-      }, 300);
+    if (redirectPath) {
+      const timeout = setTimeout(() => {
+        router.replace(redirectPath);
+      }, 500); // Petit délai pour laisser l'alerte s'afficher
+      
+      return () => clearTimeout(timeout);
     }
-  }, [authenticated, router]);
+  }, [redirectPath, router]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -41,11 +42,15 @@ export default function LoginScreen() {
         const userData = userDoc.data();
         console.log("Rôle de l'utilisateur:", userData.role);
         
-        // Afficher un message de succès SANS redirection dans l'alerte
+        // Afficher l'alerte de succès
         Alert.alert('Succès', 'Connexion réussie !');
         
-        // Marquer l'authentification comme réussie (déclenchera useEffect)
-        setAuthenticated(true);
+        // Définir le chemin de redirection en fonction du rôle
+        if (userData.role === 'coach') {
+          setRedirectPath('/(tabs)/homeCoach');
+        } else {
+          setRedirectPath('/(tabs)');
+        }
       } else {
         // L'utilisateur n'a pas de document dans Firestore
         Alert.alert('Erreur', 'Profil utilisateur incomplet');
