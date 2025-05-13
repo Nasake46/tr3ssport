@@ -47,6 +47,15 @@ export default function HomeScreen() {
     }
   };
 
+  // Fonction pour rediriger vers la page d'accueil appropriée en fonction du rôle
+  const navigateToHome = () => {
+    if (userRole === 'coach') {
+      router.push('/(tabs)/homeCoach');
+    } else {
+      router.push('/(tabs)/HomeScreen');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {loading ? (
@@ -55,6 +64,7 @@ export default function HomeScreen() {
         <>
           <Text style={styles.welcomeText}>Bienvenue !</Text>
           <Text style={styles.roleText}>Votre rôle : {userRole}</Text>
+          <Button title="Accéder à mon espace" onPress={navigateToHome} />
           <Button title="Se déconnecter" onPress={handleLogout} />
         </>
       ) : (
@@ -76,7 +86,8 @@ export default function HomeScreen() {
       )}
       <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
       <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
-      <Button title="Home" onPress={() => router.push('/(tabs)/HomeScreen')} />
+      {/* Remplacer le bouton Home statique par un bouton qui utilise la fonction conditionnelle */}
+      <Button title="Home" onPress={navigateToHome} />
     </View>
   );
 }

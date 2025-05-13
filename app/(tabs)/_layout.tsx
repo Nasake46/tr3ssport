@@ -41,14 +41,23 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-  name="homeCoach"
-  options={{
-    title: 'Coach Dashboard',
-    tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-    // Optionnel : Masquer cet onglet dans la barre de navigation
-    href: null,
-  }}
-/>
+        name="homeCoach"
+        options={{
+          title: 'Coach Dashboard',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          // Optionnel : Masquer cet onglet dans la barre de navigation
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profileCoach"
+        options={{
+          title: 'Mon Profil',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          // Ne pas l'afficher dans la barre de navigation si on veut y accéder uniquement depuis le tableau de bord coach
+          href: null,
+        }}
+      />
     </Tabs>
     
   );
