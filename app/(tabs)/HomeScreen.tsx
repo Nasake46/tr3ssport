@@ -27,19 +27,19 @@ const HomeScreen = () => {
       <View className='top_buttons' style={styles.div_head_button}>
         <TouchableOpacity>
           <View style={styles.top_buttons}>
-            <Image source={require('../../assets/images/MyCoach.png')}/>
+            <Image source={require('../../assets/images/MyCoach.png')} style={{ width: 40, height: 40 }} />
             <Text style={styles.text_base}>Mon Coach</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity>
           <View style={styles.top_buttons}>
-            <Image source={require('../../assets/images/Programm.png')}/>
+            <Image source={require('../../assets/images/Programm.png')} style={{ width: 40, height: 40 }}/>
             <Text style={styles.text_base}>Programme</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity>
           <View style={styles.top_buttons}>
-            <Image source={require('../../assets/images/follow.png')}/>
+            <Image source={require('../../assets/images/follow.png')} style={{ width: 40, height: 40 }}/>
             <Text style={styles.text_base}>Suivi</Text>
           </View>
         </TouchableOpacity>
@@ -65,7 +65,7 @@ const HomeScreen = () => {
         <TouchableOpacity onPress={() => Alert.alert('Programme pressed')}>
           <View style={styles.programm}>
             <View style={styles.programmLogo}>
-              <Image source={require('../../assets/images/Programme2.png')}></Image>
+              <Image source={require('../../assets/images/Programme2.png')} style={{ width: 40, height: 40 }}></Image>
               <Text style={styles.text_base}>Programme</Text>
             </View>
             <Text>Sur mesure</Text>
@@ -74,21 +74,21 @@ const HomeScreen = () => {
         <View style={styles.line}></View>
         <TouchableOpacity onPress={() => Alert.alert('Follow pressed')}>
           <View style={styles.programmLogo}>
-            <Image source={require('../../assets/images/follow.png')}></Image>
+            <Image source={require('../../assets/images/follow.png')} style={{ width: 40, height: 40 }}></Image>
             <Text style={styles.text_base}>Suivi et Progrès</Text>
           </View>
         </TouchableOpacity>
         <View style={styles.line}></View>
         <TouchableOpacity onPress={() => Alert.alert('Dossier pressed')}>
           <View style={styles.programmLogo}>
-            <Image source={require('../../assets/images/healthFolder.png')}></Image>
+            <Image source={require('../../assets/images/healthFolder.png')} style={{ width: 40, height: 40 }}></Image>
             <Text style={styles.text_base}>Mon dossier de bilan</Text>
           </View>
         </TouchableOpacity>
         <View style={styles.line}></View>
         <TouchableOpacity onPress={() => Alert.alert('Partenaires pressed')}>
         <View style={styles.programmLogo}>
-            <Image source={require('../../assets/images/healthPartner.png')}></Image>
+            <Image source={require('../../assets/images/healthPartner.png')} style={{ width: 40, height: 40 }}></Image>
             <Text style={styles.text_base}>Partenaires de santé</Text>
         </View>
         </TouchableOpacity>
@@ -96,7 +96,7 @@ const HomeScreen = () => {
       </View>
 
       {/* Health article */}
-      <CarouselArticles />
+      {/* <CarouselArticles /> */}
 
       </ScrollView>
     </SafeAreaView>
