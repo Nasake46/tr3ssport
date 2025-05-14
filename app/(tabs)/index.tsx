@@ -61,22 +61,22 @@ export default function HomeScreen() {
         <>
           <View style={styles.buttonContainer}>
             <Text style={styles.sectionTitle}>Espace Utilisateur</Text>
-            <Button title="Se connecter" onPress={() => router.push('/(tabs)/LoginScreen')} />
-            <Button title="S'inscrire" onPress={() => router.push('/(tabs)/registerScreen')} />
+            <Button title="Se connecter" onPress={() => router.push('/auth/LoginScreen')} />
+            <Button title="S'inscrire" onPress={() => router.push('/auth/registerScreen')} />
           </View>
           
-          <View style={styles.buttonContainer}>
+          {/* <View style={styles.buttonContainer}>
             <Text style={styles.sectionTitle}>Espace Coach</Text>
             <Button 
               title="Inscription Coach" 
               onPress={() => router.push('/(tabs)/registerCoachScreen')} 
             />
-          </View>
+          </View> */}
         </>
       )}
-      <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
+      {/* <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
       <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
-      <Button title="Home" onPress={() => router.push('/(tabs)/HomeScreen')} />
+      <Button title="Home" onPress={() => router.push('/(tabs)/HomeScreen')} /> */}
     </View>
   );
 }

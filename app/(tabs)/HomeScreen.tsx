@@ -96,7 +96,7 @@ const HomeScreen = () => {
       </View>
 
       {/* Health article */}
-      {/* <CarouselArticles /> */}
+      <CarouselArticles />
 
       </ScrollView>
     </SafeAreaView>
