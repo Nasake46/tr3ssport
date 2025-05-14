@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TextInput, Button, StyleSheet, View, Alert, Text } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, firestore } from '../../firebase';
+import { auth, firestore } from '@/firebase';
 import { useRouter } from 'expo-router';
 
 export default function RegisterScreen() {

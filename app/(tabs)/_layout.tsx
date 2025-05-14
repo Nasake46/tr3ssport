@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
@@ -15,32 +14,57 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarShowLabel: false,
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
+        tabBarStyle: {
+          position: 'absolute',
+          bottom: 50,
+          left: 20,
+          right: 20,
+          height: 70,
+          backgroundColor: '#fff',
+          borderRadius: 30,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
+          elevation: 10,
+          borderTopWidth: 0,
+          overflow: 'hidden',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexDirection: 'row',
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'LauchScreen',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Launch',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol name="paperplane.fill" size={28} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="HomeScreen"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol name="house.fill" size={28} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="ProfileScreen"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol name="person.fill" size={28} color={color} />
+          ),
         }}
       />
     </Tabs>
-    
   );
 }
