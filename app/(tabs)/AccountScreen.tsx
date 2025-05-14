@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  TextInput,
-  Button,
-} from "react-native";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import React, { useState, useEffect } from 'react';
+import { Text, View, TextInput, Button, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import * as DocumentPicker from 'expo-document-picker';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+const pickDocument = async () => {
+  const result = await DocumentPicker.getDocumentAsync({});
+  if (result.type === 'success') {
+    console.log(result.uri);
+  }
+};
 
 const AccountScreen = () => {
   const [userData, setUserData] = useState<any>(null);
@@ -20,6 +21,9 @@ const AccountScreen = () => {
     dateNaissance: "",
     genre: "",
     parc: "",
+    pathologies: "",
+    articulations: "",
+    certifMedicalURL: "",
   });
   const [uid, setUid] = useState<string | null>(null);
 
@@ -49,22 +53,84 @@ const AccountScreen = () => {
     return unsubscribe;
   }, []);
 
+  const handleFileUpload = async () => {
+    try {
+      const res = await DocumentPicker.pick({
+        type: [DocumentPicker.types.allFiles],
+      });
+
+      // Récupérer le fichier choisi
+      const fileUri = res[0].uri;
+      const fileName = res[0].name;
+
+      const storage = getStorage();
+      const storageRef = ref(storage, 'certificats/' + fileName);
+
+      const response = await fetch(fileUri);
+      const blob = await response.blob();
+
+      // Upload du fichier
+      await uploadBytes(storageRef, blob);
+
+      // Récupérer l'URL du fichier téléchargé
+      const certifUrl = await getDownloadURL(storageRef);
+
+      setForm({ ...form, certifMedicalURL: certifUrl });
+      alert('Certificat médical téléchargé avec succès');
+    } catch (e) {
+      console.error("Erreur téléchargement certificat médical", e);
+      alert('Erreur lors du téléchargement');
+    }
+  };
+  
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 20,
+      backgroundColor: '#fff',
+    },
+    header: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 20,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: '#ccc',
+      borderRadius: 5,
+      padding: 10,
+      marginBottom: 15,
+    },
+    label: {
+      fontSize: 16,
+      marginBottom: 10,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });
+
   const handleSubmit = async () => {
     if (!uid) return;
     try {
       const db = getFirestore();
       const ref = doc(db, "participants", uid);
       const date = new Date(form.dateNaissance);
-        if (isNaN(date.getTime())) {
+      if (isNaN(date.getTime())) {
         alert("Veuillez entrer une date valide au format YYYY-MM-DD");
         return;
-        }
+      }
       await setDoc(ref, {
         nom: form.nom,
         prenom: form.prenom,
         genre: form.genre,
         parc: form.parc,
         dateNaissance: Timestamp.fromDate(date),
+        pathologies: form.pathologies.split(","),
+        articulations: form.articulations.split(","),
+        certifMedicalURL: form.certifMedicalURL,
       });
 
       setUserData({ ...form, dateNaissance: form.dateNaissance });
@@ -115,89 +181,38 @@ const AccountScreen = () => {
           value={form.parc}
           onChangeText={(text) => setForm({ ...form, parc: text })}
         />
+        <TextInput
+          style={styles.input}
+          placeholder="Pathologies (séparées par des virgules)"
+          value={form.pathologies}
+          onChangeText={(text) => setForm({ ...form, pathologies: text })}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Articulations (séparées par des virgules)"
+          value={form.articulations}
+          onChangeText={(text) => setForm({ ...form, articulations: text })}
+        />
+        <Button title="Télécharger Certificat Médical" onPress={handleFileUpload} />
         <Button title="Valider" onPress={handleSubmit} />
       </ScrollView>
     );
   }
 
-  const {
-    nom,
-    prenom,
-    dateNaissance,
-    genre,
-    parc,
-    certifMedicalURL,
-    questionnaire,
-    qrCodeData,
-  } = userData;
+  const { nom, prenom, dateNaissance, genre, parc, pathologies, articulations, certifMedicalURL } = userData;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>Mon compte</Text>
       <Text style={styles.label}>Nom : {nom}</Text>
       <Text style={styles.label}>Prénom : {prenom}</Text>
-      <Text style={styles.label}>Date de naissance : {dateNaissance}</Text>
+      <Text style={styles.label}>Date de naissance : {dateNaissance?.toDate().toLocaleDateString()}</Text>
       <Text style={styles.label}>Genre : {genre}</Text>
       <Text style={styles.label}>Parc choisi : {parc}</Text>
-
-      <Text style={styles.subheader}>État du dossier</Text>
+      <Text style={styles.label}>Pathologies : {pathologies ? pathologies.join(", ") : "Aucune"}</Text>
+      <Text style={styles.label}>Articulations : {articulations ? articulations.join(", ") : "Aucune"}</Text>
       <Text style={styles.label}>Certificat médical : {certifMedicalURL ? "✅" : "❌"}</Text>
-      <Text style={styles.label}>Questionnaire rempli : {questionnaire ? "✅" : "❌"}</Text>
-
-      {questionnaire && (
-        <>
-          <Text style={styles.subheader}>Santé</Text>
-          <Text style={styles.label}>Problèmes cardiaques : {questionnaire.cardiaque ? "Oui" : "Non"}</Text>
-          <Text style={styles.label}>Malaise à l’effort : {questionnaire.malaise ? "Oui" : "Non"}</Text>
-          <Text style={styles.label}>Douleurs thoraciques : {questionnaire.thoracique ? "Oui" : "Non"}</Text>
-          <Text style={styles.label}>Asthme : {questionnaire.asthme ? "Oui" : "Non"}</Text>
-          <Text style={styles.label}>Diabète : {questionnaire.diabete ? "Oui" : "Non"}</Text>
-          <Text style={styles.label}>Enceinte : {questionnaire.enceinte?.flag ? `Oui (${questionnaire.enceinte.mois} mois)` : "Non"}</Text>
-          <Text style={styles.label}>Articulations : {renderArticulations(questionnaire.articulations)}</Text>
-        </>
-      )}
     </ScrollView>
   );
 };
-
-const renderArticulations = (art: any) => {
-  const keys = ["dos", "genoux", "epaules"];
-  const list = keys.filter(k => art[k]).map(k => k);
-  if (art.autre) list.push(art.autre);
-  return list.length > 0 ? list.join(", ") : "Aucun";
-};
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  header: {
-    fontSize: 24,
-    marginBottom: 20,
-    fontWeight: "bold",
-  },
-  subheader: {
-    fontSize: 18,
-    marginTop: 20,
-    marginBottom: 10,
-    fontWeight: "600",
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    marginBottom: 15,
-    borderRadius: 5,
-  },
-});
-
 export default AccountScreen;
