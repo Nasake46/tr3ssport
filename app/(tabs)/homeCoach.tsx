@@ -65,9 +65,11 @@ export default function CoachHomeScreen() {
         {/* En-tête */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Mon tableau de bord</Text>
-          <View style={styles.profileCircle}>
-            <Text style={styles.profileText}>Coach 1</Text>
-          </View>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profilCoach')}>
+            <View style={styles.profileCircle}>
+              <Text style={styles.profileText}>Coach 1</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Menus principaux */}
