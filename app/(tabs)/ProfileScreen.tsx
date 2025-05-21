@@ -7,11 +7,13 @@ import {
   Switch,
   ScrollView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome5, Feather } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const router = useRouter();
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -27,7 +29,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Options */}
-        <TouchableOpacity style={styles.option}>
+        <TouchableOpacity style={styles.option} onPress={() => router.push('/account/SettingsScreen')}>
           <Feather name="settings" size={20} color="#5D5A88" />
           <Text style={styles.optionText}>Paramètres du compte</Text>
         </TouchableOpacity>

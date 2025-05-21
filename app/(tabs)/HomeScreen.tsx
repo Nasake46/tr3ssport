@@ -4,10 +4,12 @@ import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CarouselArticles from '../../components/CarousselArticle';
+import { useRouter } from 'expo-router';
 
 
 const HomeScreen = () => {
   const navigation = useNavigation();
+  const router = useRouter();
 
   return (
     <SafeAreaView>
@@ -79,7 +81,7 @@ const HomeScreen = () => {
           </View>
         </TouchableOpacity>
         <View style={styles.line}></View>
-        <TouchableOpacity onPress={() => Alert.alert('Dossier pressed')}>
+        <TouchableOpacity onPress={() => router.push('/account/BilanScreen')}>
           <View style={styles.programmLogo}>
             <Image source={require('../../assets/images/healthFolder.png')} style={{ width: 40, height: 40 }}></Image>
             <Text style={styles.text_base}>Mon dossier de bilan</Text>
