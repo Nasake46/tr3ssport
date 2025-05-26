@@ -1,14 +1,16 @@
-import React from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import CarouselArticles from '../../components/CarousselArticle';
 
 
 const HomeScreen = () => {
   const navigation = useNavigation();
+  const router = useRouter();
 
+  
   return (
     <SafeAreaView>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -37,10 +39,10 @@ const HomeScreen = () => {
             <Text style={styles.text_base}>Programme</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/myAppointments')}>
           <View style={styles.top_buttons}>
-            <Image source={require('../../assets/images/follow.png')}/>
-            <Text style={styles.text_base}>Suivi</Text>
+            <Ionicons name="calendar" size={40} color="#5D5A88" />
+            <Text style={styles.text_base}>Rendez-vous</Text>
           </View>
         </TouchableOpacity>
       </View>

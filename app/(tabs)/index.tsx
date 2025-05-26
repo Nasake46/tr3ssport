@@ -86,6 +86,7 @@ export default function HomeScreen() {
       )}
       <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
       <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
+      <Button title="Register Coach" onPress={() => router.push('/(tabs)/test')} />
       {/* Remplacer le bouton Home statique par un bouton qui utilise la fonction conditionnelle */}
       <Button title="Home" onPress={navigateToHome} />
     </View>
