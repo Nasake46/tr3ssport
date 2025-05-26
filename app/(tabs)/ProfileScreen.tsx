@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,34 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome5, Feather } from '@expo/vector-icons';
+import { auth, firestore } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const router = useRouter();
+
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const docRef = doc(firestore, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setFirstName(data.firstName);
+        setLastName(data.lastName);
+        setEmail(data.email);
+      }
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
+
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -23,8 +47,8 @@ export default function ProfileScreen() {
         <View style={styles.userInfo}>
           <Ionicons name="person-circle" size={60} color="#5D5A88" />
           <View>
-            <Text style={styles.name}>Nathalie</Text>
-            <Text style={styles.email}>Nathalie.S@gmail.com</Text>
+            <Text style={styles.name}>{firstName} {lastName}</Text>
+            <Text style={styles.email}>{email}</Text>
           </View>
         </View>
 
@@ -76,7 +100,7 @@ export default function ProfileScreen() {
           <Feather name="log-out" size={18} color="#5D5A88" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
 
-        {/* Footer links (à propos, mentions...) */}
+        {/* Footer links */}
         <View style={styles.footerLinks}>
           <Text style={styles.footerText}>À propos</Text>
           <Text style={styles.footerText}>Mentions légales</Text>

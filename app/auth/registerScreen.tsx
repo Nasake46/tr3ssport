@@ -37,7 +37,7 @@ export default function RegisterScreen() {
       
       console.log('Utilisateur enregistré:', user);
       Alert.alert('Succès', 'Votre compte a été créé avec succès !');
-      router.push('/(tabs)/LoginScreen');
+      router.push('/(tabs)/HomeScreen'); // Rediriger vers l'écran d'accueil après l'inscription
       
       // Réinitialiser les champs après l'inscription
       setEmail('');

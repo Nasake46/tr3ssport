@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,34 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { auth, firestore } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function SettingsScreen() {
-  const [firstName, setFirstName] = useState('Nathalie');
-  const [lastName, setLastName] = useState('Marina');
-  const [email, setEmail] = useState('nathalie.s@gmail.com');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('+33 6 12 34 56 78');
   const [address, setAddress] = useState('123 Rue Exemple, Paris');
   const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(firestore, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFirstName(data.firstName);
+          setLastName(data.lastName);
+          setEmail(data.email);
+        }
+      }
+    });
+
+      return () => unsubscribe();
+}, []);
 
   return (
     <SafeAreaView style={{ flex: 1 }}>

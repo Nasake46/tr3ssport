@@ -9,6 +9,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -20,6 +22,8 @@ export default function HomeScreen() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setUserRole(userData.role);
+            setFirstName(userData.firstName);
+            setLastName(userData.lastName);
           } else {
             setUserRole("Rôle inconnu");
           }
@@ -53,7 +57,7 @@ export default function HomeScreen() {
         <Text>Chargement...</Text>
       ) : userRole ? (
         <>
-          <Text style={styles.welcomeText}>Bienvenue !</Text>
+          <Text style={styles.welcomeText}>Bienvenue {firstName} {lastName} !</Text>
           <Text style={styles.roleText}>Votre rôle : {userRole}</Text>
           <Button title="Se déconnecter" onPress={handleLogout} />
         </>

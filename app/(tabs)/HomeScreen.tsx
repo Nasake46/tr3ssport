@@ -1,15 +1,36 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CarouselArticles from '../../components/CarousselArticle';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, firestore } from '@/firebase';
 import { useRouter } from 'expo-router';
 
 
 const HomeScreen = () => {
   const navigation = useNavigation();
   const router = useRouter();
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(firestore, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFirstName(data.firstName);
+          setLastName(data.lastName);
+        }
+      }
+    });
+  
+    return () => unsubscribe();
+  }, []);
 
   return (
     <SafeAreaView>
@@ -17,10 +38,10 @@ const HomeScreen = () => {
       {/* Header */}
       <View className='header' style={styles.div_header}>
         <Text style={styles.text_h1}>Mon tableau de bord</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/ProfileScreen')}>
           <View className="profil">
             <Ionicons name="person" size={24} color="#333" />
-            <Text style={styles.text_base}>Nathalie Marina</Text>
+            <Text style={styles.text_base}>{firstName} {lastName}</Text>
           </View>
         </TouchableOpacity>
       </View>
