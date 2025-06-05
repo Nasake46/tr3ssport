@@ -23,14 +23,12 @@ const HomeScreen = () => {
             <Text style={styles.text_base}>Nathalie Marina</Text>
           </View>
         </TouchableOpacity>
-      </View>
-
-      {/* Top buttons */}
+      </View>      {/* Top buttons */}
       <View className='top_buttons' style={styles.div_head_button}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/bookAppointment')}>
           <View style={styles.top_buttons}>
             <Image source={require('../../assets/images/MyCoach.png')}/>
-            <Text style={styles.text_base}>Mon Coach</Text>
+            <Text style={styles.text_base}>Prise de RDV</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity>
@@ -86,6 +84,12 @@ const HomeScreen = () => {
             <Image source={require('../../assets/images/healthFolder.png')}></Image>
             <Text style={styles.text_base}>Mon dossier de bilan</Text>
           </View>
+        </TouchableOpacity>
+        <View style={styles.line}></View>        <TouchableOpacity onPress={() => router.push('/(tabs)/myAppointments')}>
+        <View style={styles.programmLogo}>
+            <Ionicons name="calendar-outline" size={24} color="#5D5A88" />
+            <Text style={styles.text_base}>Mes demandes RDV</Text>
+        </View>
         </TouchableOpacity>
         <View style={styles.line}></View>
         <TouchableOpacity onPress={() => Alert.alert('Partenaires pressed')}>

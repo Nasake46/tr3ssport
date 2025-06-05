@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router';
 import { auth, firestore } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { getCoachAppointmentRequests } from '@/services/appointmentService';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 
 export default function CoachHomeScreen() {
   const router = useRouter();
   const [coachData, setCoachData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   useEffect(() => {
     // Récupérer les données du coach
@@ -19,9 +21,7 @@ export default function CoachHomeScreen() {
         if (!user) {
           router.replace('/(tabs)');
           return;
-        }
-
-        const userDoc = await getDoc(doc(firestore, "users", user.uid));
+        }        const userDoc = await getDoc(doc(firestore, "users", user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           if (userData.role !== 'coach') {
@@ -29,6 +29,15 @@ export default function CoachHomeScreen() {
             return;
           }
           setCoachData(userData);
+          
+          // Charger le nombre de demandes en attente
+          try {
+            const requests = await getCoachAppointmentRequests(user.uid);
+            const pendingCount = requests.filter(req => req.status === 'pending').length;
+            setPendingRequestsCount(pendingCount);
+          } catch (error) {
+            console.error("Erreur lors du chargement des demandes:", error);
+          }
         } else {
           router.replace('/(tabs)');
         }
@@ -70,9 +79,7 @@ export default function CoachHomeScreen() {
               <Text style={styles.profileText}>Coach 1</Text>
             </View>
           </TouchableOpacity>
-        </View>
-
-        {/* Menus principaux */}
+        </View>        {/* Menus principaux */}
         <View style={styles.menuContainer}>
           <TouchableOpacity style={styles.menuButton}>
             <View style={styles.iconCircle}>
@@ -80,8 +87,20 @@ export default function CoachHomeScreen() {
             </View>
             <Text style={styles.menuText}>Mes clients</Text>
           </TouchableOpacity>
+            <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => router.push('/(tabs)/coachAppointmentRequests')}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="calendar-outline" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Demandes RDV</Text>
+          </TouchableOpacity>
           
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => router.push('/(tabs)/coachSchedule')}
+          >
             <View style={styles.iconCircle}>
               <Ionicons name="calendar" size={24} color="#7667ac" />
             </View>
@@ -98,12 +117,14 @@ export default function CoachHomeScreen() {
 
         {/* Alertes */}
         <Text style={styles.sectionTitle}>Alertes</Text>
-        <View style={styles.alertsContainer}>
-          <View style={styles.alertBox}>
+        <View style={styles.alertsContainer}>          <View style={styles.alertBox}>
             <Text style={styles.alertText}>
-              5 clients en attente <Ionicons name="alert" size={16} color="orange" />
+              {pendingRequestsCount} demande{pendingRequestsCount > 1 ? 's' : ''} en attente <Ionicons name="alert" size={16} color="orange" />
             </Text>
-            <TouchableOpacity style={styles.viewButton}>
+            <TouchableOpacity 
+              style={styles.viewButton}
+              onPress={() => router.push('/(tabs)/coachAppointmentRequests')}
+            >
               <Text style={styles.viewButtonText}>Voir</Text>
             </TouchableOpacity>
           </View>

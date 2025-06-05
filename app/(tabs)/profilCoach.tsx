@@ -9,7 +9,8 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { InfoItem } from '@/components/InfoItem';
 import { SectionTitle } from '@/components/SectionTitle';
-import { SkillTag } from '@/components/SkillTag';
+import { TagManager } from '@/components/TagManager';
+import { CoachTag } from '@/models/tag';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileCoachScreen() {
@@ -18,6 +19,8 @@ export default function ProfileCoachScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [tags, setTags] = useState<CoachTag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -313,16 +316,15 @@ export default function ProfileCoachScreen() {
                 "Aucune biographie n'a été ajoutée. Complétez votre profil pour vous présenter à vos clients potentiels."}
             </ThemedText>
           )}
-        </View>
-
-        {/* Compétences */}
+        </View>        {/* Tags et spécialités */}
         <View style={styles.section}>
-          <SectionTitle title="Compétences" />
-          <View style={styles.skillsContainer}>
-            {skills.map((skill, index) => (
-              <SkillTag key={index} label={skill} />
-            ))}
-          </View>
+          <TagManager 
+            coachId={auth.currentUser?.uid || ''} 
+            editable={isEditing}
+            onTagsChange={(tags) => {
+              console.log('Tags mis à jour:', tags);
+            }}
+          />
         </View>
 
         {/* Tarifs et prestations */}

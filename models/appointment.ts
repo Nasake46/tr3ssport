@@ -14,11 +14,43 @@ import {
 import { firestore } from '../firebase';
 
 export type AppointmentStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled';
+export type SportLevel = 'debutant' | 'confirme' | 'expert';
+
+export interface AppointmentRequest {
+  id?: string;           // ID généré par Firebase
+  userId: string;        // ID de l'utilisateur qui prend rendez-vous
+  coachId: string;       // ID du coach concerné
+  
+  // Informations utilisateur
+  userFirstName: string;
+  userLastName: string;
+  userPhone: string;
+  userEmail: string;
+  
+  // Informations de la demande
+  objective: string;     // Objectif du coaching
+  sportLevel: SportLevel; // Niveau sportif
+  preferredLocation: string; // Lieu de préférence
+  preferredDate?: Date;  // Date souhaitée (optionnel)
+  preferredTime?: string; // Heure souhaitée (optionnel)
+  additionalNotes?: string; // Notes supplémentaires
+  
+  // Informations confirmées (remplies par le coach lors de l'acceptation)
+  confirmedDate?: Date;  // Date confirmée par le coach
+  confirmedTime?: string; // Heure confirmée par le coach
+  confirmedLocation?: string; // Lieu confirmé par le coach
+  
+  status: AppointmentStatus; // Statut de la demande
+  coachResponse?: string; // Réponse du coach
+  createdAt: Date;       // Date de création
+  updatedAt: Date;       // Date de dernière mise à jour
+}
 
 export interface Appointment {
   id?: string;           // ID généré par Firebase
   userId: string;        // ID de l'utilisateur qui prend rendez-vous
   coachId: string;       // ID du coach concerné
+  requestId?: string;    // ID de la demande originale
   date: Date;            // Date du rendez-vous
   startTime: string;     // Heure de début (format "HH:MM")
   endTime: string;       // Heure de fin (format "HH:MM")
@@ -29,12 +61,20 @@ export interface Appointment {
   updatedAt: Date;       // Date de dernière mise à jour
 }
 
+export interface FirestoreAppointmentRequest extends Omit<AppointmentRequest, 'preferredDate' | 'confirmedDate' | 'createdAt' | 'updatedAt'> {
+  preferredDate?: Timestamp;
+  confirmedDate?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface FirestoreAppointment extends Omit<Appointment, 'date' | 'createdAt' | 'updatedAt'> {
   date: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
+export type CreateAppointmentRequestData = Omit<AppointmentRequest, 'id' | 'createdAt' | 'updatedAt'>;
 export type CreateAppointmentData = Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>;
 
 export const convertFirestoreAppointment = (doc: DocumentData): Appointment => {
