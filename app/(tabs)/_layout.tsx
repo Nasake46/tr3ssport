@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -19,20 +19,16 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarStyle: {
           position: 'absolute',
-          bottom: 50,
           left: 20,
           right: 20,
-          height: 70,
           backgroundColor: '#fff',
           borderRadius: 30,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 10 },
-          shadowOpacity: 0.08,
+          shadowOpacity: 0.50,
           shadowRadius: 10,
           elevation: 10,
-          borderTopWidth: 0,
           overflow: 'hidden',
-          justifyContent: 'center',
           alignItems: 'center',
           flexDirection: 'row',
         },
@@ -47,15 +43,45 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="HomeScreen"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol name="house.fill" size={28} color={color} />
-          ),
-        }}
-      />
+<Tabs.Screen
+  name="HomeScreen"
+  options={{
+    title: 'Home',
+    tabBarIcon: ({ focused }) => (
+      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        {focused && (
+          <View
+            style={{
+              position: 'absolute',
+              top: -20,
+              width: 60,
+              height: 60,
+              backgroundColor: '#fff',
+              borderRadius: 30,
+              zIndex: 0,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 6,
+              elevation: 6,
+            }}
+          />
+        )}
+        <Image
+          source={require('@/assets/images/logoT.png')}
+          style={{
+            width: 32,
+            height: 32,
+            resizeMode: 'contain',
+            zIndex: 1,
+            marginTop: focused ? -5 : 0,
+          }}
+        />
+      </View>
+    ),
+  }}
+/>
+
       <Tabs.Screen
         name="ProfileScreen"
         options={{
