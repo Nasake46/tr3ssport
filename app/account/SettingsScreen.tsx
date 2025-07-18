@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, firestore } from '@/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { styles } from '../styles/account/SettingsScreen.styles';
 
 export default function SettingsScreen() {
   const [firstName, setFirstName] = useState('');
@@ -100,52 +101,3 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#5D5A88',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  fieldBlock: {
-    marginBottom: 10,
-  },
-  label: {
-    fontWeight: 'bold',
-    color: '#5D5A88',
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#D4D2E3',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  line: {
-    width: '100%',
-    height: 1,
-    backgroundColor: '#D4D2E3',
-    marginVertical: 12,
-  },
-  saveButton: {
-    marginTop: 30,
-    backgroundColor: '#5D5A88',
-    paddingVertical: 14,
-    borderRadius: 10,
-  },
-  saveText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});

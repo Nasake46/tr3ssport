@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   TextInput,
-  StyleSheet,
   View,
   Alert,
   Text,
@@ -9,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Image,
 } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -66,62 +64,66 @@ export default function RegisterScreen() {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.logoContainer}>
-      <Image
-        source={require('@/assets/images/logoT.png')}
-        style={styles.logo}
-      />
-  </View>
         <Text style={styles.title}>Créer un compte</Text>
-
         {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Nom"
-          value={firstName}
-          onChangeText={setFirstName}
-          autoCapitalize="words"
-          placeholderTextColor="#999"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Prénom"
-          value={lastName}
-          onChangeText={setLastName}
-          autoCapitalize="words"
-          placeholderTextColor="#999"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor="#999"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Numéro de téléphone"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-          keyboardType="phone-pad"
-          autoCapitalize="none"
-          placeholderTextColor="#999"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Mot de passe"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholderTextColor="#999"
-        />
+        <View style={styles.formCard}>
+          <Text style={styles.label}>Prénom</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Prénom"
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            placeholderTextColor="#999"
+          />
 
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>S'inscrire</Text>
-        </TouchableOpacity>
+          <Text style={styles.label}>Nom</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Nom"
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+            placeholderTextColor="#999"
+          />
+
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            placeholderTextColor="#999"
+          />
+
+          <Text style={styles.label}>Numéro de téléphone</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Numéro de téléphone"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            keyboardType="phone-pad"
+            autoCapitalize="none"
+            placeholderTextColor="#999"
+          />
+
+          <Text style={styles.label}>Mot de passe</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Mot de passe"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholderTextColor="#999"
+          />
+
+          <TouchableOpacity style={styles.button} onPress={handleRegister}>
+            <Text style={styles.buttonText}>Créer mon compte</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
