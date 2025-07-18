@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   TextInput,
-  StyleSheet,
   View,
   Alert,
   ActivityIndicator,
@@ -12,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { styles } from '../styles/auth/LoginScreen.styles';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -38,9 +38,9 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <View style={styles.content}>
-        <Image source={require('@/assets/images/logoT.png')} style={styles.logo} />
+      <Image source={require('@/assets/images/logoT.png')} style={styles.logo} />
 
+      <View style={styles.formContainer}>
         <Text style={styles.title}>Connexion</Text>
 
         <TextInput
@@ -64,7 +64,7 @@ export default function LoginScreen() {
         <Text style={styles.forgot}>Mot de passe oublié ?</Text>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#0D0C2B" />
+          <ActivityIndicator size="large" color="#F4AF00" />
         ) : (
           <>
             <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
@@ -76,7 +76,9 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </>
         )}
+      </View>
 
+      <View style={styles.bottomSection}>
         <View style={styles.separator}>
           <View style={styles.line} />
           <Text style={styles.or}>Continuer avec</Text>
@@ -102,116 +104,3 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F7F3',
-    justifyContent: 'space-between',
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    resizeMode: 'contain',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 24,
-    color: '#0D0C2B',
-    fontWeight: '600',
-    marginBottom: 24,
-  },
-  input: {
-    height: 48,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    color: '#000',
-    marginBottom: 16,
-  },
-  forgot: {
-    alignSelf: 'flex-end',
-    marginBottom: 16,
-    color: '#444',
-    fontSize: 12,
-  },
-  loginButton: {
-    backgroundColor: '#0D0C2B',
-    paddingVertical: 14,
-    borderRadius: 25,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  loginButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  outlineButton: {
-    borderWidth: 1,
-    borderColor: '#000',
-    paddingVertical: 14,
-    borderRadius: 25,
-    width: '100%',
-    alignItems: 'center',
-  },
-  outlineButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  separator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#aaa',
-  },
-  or: {
-    marginHorizontal: 8,
-    color: '#555',
-    fontSize: 12,
-  },
-  socials: {
-    flexDirection: 'row',
-    gap: 20,
-    marginBottom: 24,
-  },
-  social: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0D0C2B',
-  },
-  coachLink: {
-    fontSize: 14,
-    color: '#0D0C2B',
-    textDecorationLine: 'underline',
-  },
-  footer: {
-    backgroundColor: '#0D0C2B',
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  footerTitle: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  footerText: {
-    color: '#fff',
-    fontSize: 12,
-  },
-});
