@@ -365,12 +365,22 @@ export default function ProfileCoachScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleEditPress}
-          >
-            <ThemedText style={styles.actionButtonText}>Modifier mon profil</ThemedText>
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={styles.secondaryButton}
+              onPress={() => router.push('/coachDashboard')}
+            >
+              <Ionicons name="calendar" size={20} color="#7667ac" />
+              <ThemedText style={styles.secondaryButtonText}>Demandes de RDV</ThemedText>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleEditPress}
+            >
+              <ThemedText style={styles.actionButtonText}>Modifier mon profil</ThemedText>
+            </TouchableOpacity>
+          </View>
         )}
       </ThemedView>
     </ScrollView>
@@ -480,6 +490,23 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#666',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  secondaryButton: {
+    backgroundColor: '#F0F0F5',
+    borderRadius: 10,
+    padding: 16,
+    alignItems: 'center',
+    marginVertical: 16,
+    flex: 1,
+    marginRight: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryButtonText: {
+    color: '#7667ac',
     fontWeight: 'bold',
     fontSize: 16,
   },

@@ -50,19 +50,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profileCoach"
+        name="profilCoach"
         options={{
           title: 'Mon Profil',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
           // Ne pas l'afficher dans la barre de navigation si on veut y accéder uniquement depuis le tableau de bord coach
           href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="myAppointments"
-        options={{
-          title: 'Mes Rendez-vous',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
         }}
       />
     </Tabs>

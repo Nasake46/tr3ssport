@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, StyleSheet, View, Text } from 'react-native';
+import { Button, StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { auth, firestore } from '@/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -64,6 +64,8 @@ export default function HomeScreen() {
         <>
           <Text style={styles.welcomeText}>Bienvenue !</Text>
           <Text style={styles.roleText}>Votre rôle : {userRole}</Text>
+          
+          
           <Button title="Accéder à mon espace" onPress={navigateToHome} />
           <Button title="Se déconnecter" onPress={handleLogout} />
         </>
@@ -84,11 +86,6 @@ export default function HomeScreen() {
           </View>
         </>
       )}
-      <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
-      <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
-      <Button title="Register Coach" onPress={() => router.push('/(tabs)/test')} />
-      {/* Remplacer le bouton Home statique par un bouton qui utilise la fonction conditionnelle */}
-      <Button title="Home" onPress={navigateToHome} />
     </View>
   );
 }
@@ -120,5 +117,25 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 18,
     marginBottom: 20,
-  }
+  },
+  clientMenu: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 20,
+  },
+  menuButton: {
+    backgroundColor: '#7667ac',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  groupMenuButton: {
+    backgroundColor: '#4CAF50', // Couleur différente pour les rendez-vous de groupe
+  },
+  menuButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import CarouselArticles from '../../components/CarousselArticle';
+import FloatingActionButton from '../../components/appointments/FloatingActionButton';
 
 
 const HomeScreen = () => {
@@ -12,8 +13,9 @@ const HomeScreen = () => {
 
   
   return (
-    <SafeAreaView>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+    <View style={{ flex: 1 }}>
+      <SafeAreaView>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Header */}
       <View className='header' style={styles.div_header}>
         <Text style={styles.text_h1}>Mon tableau de bord</Text>
@@ -25,10 +27,10 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>      {/* Top buttons */}
       <View className='top_buttons' style={styles.div_head_button}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/bookAppointment')}>
+        <TouchableOpacity>
           <View style={styles.top_buttons}>
             <Image source={require('../../assets/images/MyCoach.png')}/>
-            <Text style={styles.text_base}>Prise de RDV</Text>
+            <Text style={styles.text_base}>Mon Coach</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity>
@@ -37,10 +39,10 @@ const HomeScreen = () => {
             <Text style={styles.text_base}>Programme</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/myAppointments')}>
+        <TouchableOpacity>
           <View style={styles.top_buttons}>
-            <Ionicons name="calendar" size={40} color="#5D5A88" />
-            <Text style={styles.text_base}>Rendez-vous</Text>
+            <Ionicons name="fitness" size={40} color="#5D5A88" />
+            <Text style={styles.text_base}>Entraînement</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -49,16 +51,56 @@ const HomeScreen = () => {
       <View className="sessions" style={styles.sessions}>
           <View>
             <Text style={styles.text_h1}>Séances</Text>
-            <Text style={styles.text_base}>Lorem ipsum dolor sit, amet culpa.</Text>
+            <Text style={styles.text_base}>Découvrez vos programmes d'entraînement.</Text>
           </View>
-          <TouchableOpacity style={styles.button} onPress={() => Alert.alert('Consulter pressed')}>
+          <TouchableOpacity style={styles.button} onPress={() => Alert.alert('Programmes disponibles')}>
             <Text style={styles.text_base}>Consulter</Text>
           </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.big_session} onPress={() => Alert.alert('Séances pressed')}>
-        <Text style={styles.text_h1}>Séances à venir</Text>
-        <Text>Lorem ipsum dolor sit, amet consectetur adipisicing elit</Text>
+      <TouchableOpacity style={styles.big_session} onPress={() => Alert.alert('Programmes disponibles')}>
+        <Text style={styles.text_h1}>Programmes à venir</Text>
+        <Text>Consultez vos programmes d'entraînement personnalisés</Text>
       </TouchableOpacity>
+
+      {/* Rendez-vous Section */}
+      <View className="appointments_section" style={styles.appointmentsSection}>
+        <Text style={styles.text_h1}>Mes Rendez-vous</Text>
+        <Text style={styles.text_base}>Gérez vos séances avec vos coaches</Text>
+        
+        <View style={styles.appointmentButtons}>
+          <TouchableOpacity 
+            style={styles.appointmentButton} 
+            onPress={() => router.push('/appointments/create')}
+          >
+            <Ionicons name="add-circle" size={24} color="#007AFF" />
+            <Text style={styles.appointmentButtonText}>Nouveau RDV</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.appointmentButton} 
+            onPress={() => router.push('/appointments/client-dashboard')}
+          >
+            <Ionicons name="calendar" size={24} color="#007AFF" />
+            <Text style={styles.appointmentButtonText}>Mes RDV</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.appointmentButton} 
+            onPress={() => router.push('/invitations')}
+          >
+            <Ionicons name="mail" size={24} color="#007AFF" />
+            <Text style={styles.appointmentButtonText}>Invitations</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.appointmentButton} 
+            onPress={() => router.push('/calendar')}
+          >
+            <Ionicons name="calendar-outline" size={24} color="#007AFF" />
+            <Text style={styles.appointmentButtonText}>Calendrier</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Other links */}
       <View className="other_links" style={styles.other_links}>
@@ -85,12 +127,6 @@ const HomeScreen = () => {
             <Text style={styles.text_base}>Mon dossier de bilan</Text>
           </View>
         </TouchableOpacity>
-        <View style={styles.line}></View>        <TouchableOpacity onPress={() => router.push('/(tabs)/myAppointments')}>
-        <View style={styles.programmLogo}>
-            <Ionicons name="calendar-outline" size={24} color="#5D5A88" />
-            <Text style={styles.text_base}>Mes demandes RDV</Text>
-        </View>
-        </TouchableOpacity>
         <View style={styles.line}></View>
         <TouchableOpacity onPress={() => Alert.alert('Partenaires pressed')}>
         <View style={styles.programmLogo}>
@@ -99,13 +135,15 @@ const HomeScreen = () => {
         </View>
         </TouchableOpacity>
         <View style={styles.line}></View>
-      </View>
-
-      {/* Health article */}
+      </View>      {/* Health article */}
       <CarouselArticles />
 
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+      
+      {/* Bouton flottant pour créer un RDV */}
+      <FloatingActionButton />
+    </View>
   );
 };
 
@@ -187,7 +225,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#D4D2E3',
     marginTop: 10,
     alignSelf: 'center',
-  }
+  },
+  appointmentsSection: {
+    padding: 20,
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  appointmentButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15,
+  },
+  appointmentButton: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  appointmentButtonText: {
+    color: '#007AFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 5,
+    textAlign: 'center',
+  },
 });
 
 export default HomeScreen;
