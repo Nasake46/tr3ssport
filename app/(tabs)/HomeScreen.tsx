@@ -51,7 +51,7 @@ const HomeScreen = () => {
 
       {/* Top buttons */}
       <View className='top_buttons' style={styles.div_head_button}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/coachScreen')}>
           <View style={styles.top_buttons}>
             <Image source={require('../../assets/images/MyCoach.png')} style={{ width: 40, height: 40 }} />
             <Text style={styles.text_base}>Mon Coach</Text>
