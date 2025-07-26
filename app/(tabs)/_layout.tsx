@@ -58,6 +58,14 @@ export default function TabLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+      name="events"
+      options={{
+        title: 'Événements',
+        tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
+        }}
+      />
+
     </Tabs>
     
   );

@@ -1,15 +1,20 @@
 import { View, Text, FlatList, TouchableOpacity, Modal, Button, TextInput, Alert } from 'react-native';
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { collection, getDocs, addDoc, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { getAuth } from 'firebase/auth';
+import Fuse from 'fuse.js';
 
 export default function MessagingScreen() {
   const [contacts, setContacts] = useState<{ id: string; name: string; conversationId: string }[]>([]);
+  const [groupChats, setGroupChats] = useState<{ id: string; memberCount: number }[]>([]);
+  const [showGroups, setShowGroups] = useState(false);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [requests, setRequests] = useState<{ id: string; fromId: string; name: string }[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [groupModalVisible, setGroupModalVisible] = useState(false);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const currentUser = getAuth().currentUser;
 
@@ -24,48 +29,40 @@ export default function MessagingScreen() {
   }, [currentUser]);
 
   const fetchConversations = async () => {
+    if (!currentUser) return;
+
     const convQuery = query(
       collection(firestore, 'conversations'),
       where('members', 'array-contains', currentUser.uid)
     );
     const convSnapshot = await getDocs(convQuery);
 
-    const otherUserIds: string[] = [];
-    const convIdByUserId: Record<string, string> = {};
+    const oneToOne: { id: string; name: string; conversationId: string }[] = [];
+    const groupList: { id: string; memberCount: number }[] = [];
 
-    convSnapshot.docs.forEach(doc => {
-      const data = doc.data();
+    for (const docSnap of convSnapshot.docs) {
+      const data = docSnap.data();
       const members: string[] = data.members || [];
-      const otherUserId = members.find(id => id !== currentUser.uid);
-      if (otherUserId) {
-        otherUserIds.push(otherUserId);
-        convIdByUserId[otherUserId] = doc.id;
+
+      if (members.length === 2) {
+        const otherId = members.find(id => id !== currentUser.uid);
+        if (otherId) {
+          const userSnap = await getDocs(query(collection(firestore, 'users'), where('__name__', '==', otherId)));
+          const userData = userSnap.docs[0]?.data();
+          const name = `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || 'Utilisateur';
+          oneToOne.push({ id: otherId, name, conversationId: docSnap.id });
+        }
+      } else {
+        groupList.push({ id: docSnap.id, memberCount: members.length });
       }
-    });
-
-    const chunks: string[][] = [];
-    for (let i = 0; i < otherUserIds.length; i += 10) {
-      chunks.push(otherUserIds.slice(i, i + 10));
     }
 
-    let usersList: { id: string; name: string; conversationId: string }[] = [];
-
-    for (const chunk of chunks) {
-      const usersQuery = query(collection(firestore, 'users'), where('__name__', 'in', chunk));
-      const usersSnapshot = await getDocs(usersQuery);
-      usersList = usersList.concat(
-        usersSnapshot.docs.map(doc => {
-          const data = doc.data();
-          const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Utilisateur';
-          return { id: doc.id, name, conversationId: convIdByUserId[doc.id] };
-        })
-      );
-    }
-
-    setContacts(usersList);
+    setContacts(oneToOne);
+    setGroupChats(groupList);
   };
 
   const fetchUsers = async () => {
+    if (!currentUser) return;
     const snapshot = await getDocs(collection(firestore, 'users'));
     const userList = snapshot.docs
       .filter(doc => doc.id !== currentUser?.uid)
@@ -134,9 +131,38 @@ export default function MessagingScreen() {
     fetchContactRequests();
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const createGroupConversation = async () => {
+    if (!currentUser) return;
+    if (selectedContacts.length < 1) {
+      Alert.alert('Sélectionnez au moins un contact');
+      return;
+    }
+
+    const members = [...selectedContacts, currentUser.uid];
+    try {
+      const convRef = await addDoc(collection(firestore, 'conversations'), {
+        members,
+        createdAt: Date.now(),
+      });
+      setGroupModalVisible(false);
+      setSelectedContacts([]);
+      fetchConversations();
+      openChat(convRef.id);
+    } catch (error) {
+      console.error('Erreur création groupe', error);
+    }
+  };
+
+  const fuse = new Fuse(users, {
+    keys: ['name'],
+    threshold: 0.4,
+    ignoreLocation: true,
+    includeScore: true,
+  });
+
+  const filteredUsers = searchQuery
+    ? fuse.search(searchQuery).map(result => result.item)
+    : users;
 
   return (
     <View style={{ flex: 1, padding: 20 }}>
@@ -169,7 +195,27 @@ export default function MessagingScreen() {
         ListEmptyComponent={<Text>Aucune conversation pour le moment</Text>}
       />
 
+      <TouchableOpacity onPress={() => setShowGroups(prev => !prev)} style={{ marginTop: 20, marginBottom: 10 }}>
+        <Text style={{ fontSize: 18, color: 'blue' }}>{showGroups ? 'Masquer les groupes' : 'Afficher les groupes'}</Text>
+      </TouchableOpacity>
+
+      {showGroups && (
+        <FlatList
+          data={groupChats}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => openChat(item.id)}
+              style={{ padding: 15, borderBottomWidth: 1, borderColor: '#ccc', backgroundColor: '#f0f0f0' }}
+            >
+              <Text style={{ fontSize: 16 }}>Groupe ({item.memberCount} membres)</Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+
       <Button title="Ajouter un contact" onPress={fetchUsers} />
+      <Button title="Créer un groupe" onPress={() => setGroupModalVisible(true)} />
 
       <Modal visible={modalVisible} animationType="slide">
         <View style={{ flex: 1, padding: 20 }}>
@@ -203,6 +249,41 @@ export default function MessagingScreen() {
           />
 
           <Button title="Annuler" onPress={() => setModalVisible(false)} />
+        </View>
+      </Modal>
+
+      <Modal visible={groupModalVisible} animationType="slide">
+        <View style={{ flex: 1, padding: 20 }}>
+          <Text style={{ fontSize: 20, marginBottom: 10 }}>Créer un groupe</Text>
+
+          <FlatList
+            data={contacts}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => {
+              const selected = selectedContacts.includes(item.id);
+              return (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedContacts(prev =>
+                      selected ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                    );
+                  }}
+                  style={{
+                    padding: 15,
+                    borderBottomWidth: 1,
+                    borderColor: '#ccc',
+                    backgroundColor: selected ? '#e0f7fa' : '#fff',
+                  }}
+                >
+                  <Text style={{ fontSize: 18 }}>{item.name}</Text>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={<Text>Aucun contact disponible</Text>}
+          />
+
+          <Button title="Créer le groupe" onPress={createGroupConversation} />
+          <Button title="Annuler" onPress={() => setGroupModalVisible(false)} />
         </View>
       </Modal>
     </View>
