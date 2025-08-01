@@ -86,7 +86,7 @@ export default function HomeScreen() {
       )}
       <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
       <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
-      <Button title="Login Coach" onPress={() => router.push('/(tabs)/loginCoachScreen')} />
+      {/* <Button title="Login Coach" onPress={() => router.push('/(tabs)/loginCoachScreen')} /> */}
       <Button title="Register Coach" onPress={() => router.push('/(tabs)/registerCoachScreen')} />
     </View>
   );

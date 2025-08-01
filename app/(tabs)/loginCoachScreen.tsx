@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TextInput, Button, StyleSheet, View, Alert } from 'react-native';
 import auth from '@react-native-firebase/auth';
 
-export default function LoginCoachScreen() {
+export default function loginCoachScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
