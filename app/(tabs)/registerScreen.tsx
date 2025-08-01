@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
-import { TextInput, Button, StyleSheet, View, Alert, Text } from 'react-native';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, firestore } from '../../firebase';
-import { useRouter } from 'expo-router';
+import { TextInput, Text, TouchableOpacity, StyleSheet, View } from 'react-native';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -54,67 +50,106 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
-      <TextInput
-        style={styles.input}
-        placeholder="Nom"
-        value={firstName}
-        onChangeText={setFirstName}
-        autoCapitalize="words"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Prénom"
-        value={lastName}
-        onChangeText={setLastName}
-        autoCapitalize="words"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Numéro de téléphone"
-        value={phoneNumber}
-        onChangeText={setPhoneNumber}
-        keyboardType="phone-pad"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Mot de passe"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <Button title="S'inscrire" onPress={handleRegister} />
+    <View style={styles.screen}>
+      <Text style={styles.title}>Créer un compte</Text>
+      <View style={styles.form}>
+        <Text style={styles.label}>Prénom</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Prénom"
+          value={firstName}
+          onChangeText={setFirstName}
+          autoCapitalize="words"
+        />
+
+        <Text style={styles.label}>Nom</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nom"
+          value={lastName}
+          onChangeText={setLastName}
+          autoCapitalize="words"
+        />
+
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="example@email.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        <Text style={styles.label}>Numéro de téléphone</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="(+33) 06 -- -- -- --"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
+          autoCapitalize="none"
+        />
+
+        <Text style={styles.label}>Mot de passe</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Mot de passe"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <TouchableOpacity style={styles.button} onPress={handleRegister}>
+          <Text style={styles.buttonText}>Créer mon compte</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
     justifyContent: 'center',
-    padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#3F3D56',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  form: {
+    backgroundColor: '#F5F3FE',
+    borderRadius: 20,
+    padding: 20,
+  },
+  label: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#3F3D56',
   },
   input: {
-    height: 40,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    marginBottom: 12,
-    paddingHorizontal: 8,
-    borderRadius: 4,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    fontSize: 16,
   },
-  error: {
-    color: 'red',
-    marginBottom: 10,
-    textAlign: 'center',
+  button: {
+    backgroundColor: '#5C4D91',
+    borderRadius: 25,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
