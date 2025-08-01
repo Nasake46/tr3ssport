@@ -50,7 +50,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profileCoach"
+        name="profilCoach"
         options={{
           title: 'Mon Profil',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,

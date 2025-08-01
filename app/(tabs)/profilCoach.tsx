@@ -9,7 +9,8 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { InfoItem } from '@/components/InfoItem';
 import { SectionTitle } from '@/components/SectionTitle';
-import { SkillTag } from '@/components/SkillTag';
+import { TagManager } from '@/components/TagManager';
+import { CoachTag } from '@/models/tag';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileCoachScreen() {
@@ -18,6 +19,8 @@ export default function ProfileCoachScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [tags, setTags] = useState<CoachTag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -313,16 +316,15 @@ export default function ProfileCoachScreen() {
                 "Aucune biographie n'a été ajoutée. Complétez votre profil pour vous présenter à vos clients potentiels."}
             </ThemedText>
           )}
-        </View>
-
-        {/* Compétences */}
+        </View>        {/* Tags et spécialités */}
         <View style={styles.section}>
-          <SectionTitle title="Compétences" />
-          <View style={styles.skillsContainer}>
-            {skills.map((skill, index) => (
-              <SkillTag key={index} label={skill} />
-            ))}
-          </View>
+          <TagManager 
+            coachId={auth.currentUser?.uid || ''} 
+            editable={isEditing}
+            onTagsChange={(tags) => {
+              console.log('Tags mis à jour:', tags);
+            }}
+          />
         </View>
 
         {/* Tarifs et prestations */}
@@ -363,12 +365,22 @@ export default function ProfileCoachScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleEditPress}
-          >
-            <ThemedText style={styles.actionButtonText}>Modifier mon profil</ThemedText>
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={styles.secondaryButton}
+              onPress={() => router.push('/coachDashboard')}
+            >
+              <Ionicons name="calendar" size={20} color="#7667ac" />
+              <ThemedText style={styles.secondaryButtonText}>Demandes de RDV</ThemedText>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleEditPress}
+            >
+              <ThemedText style={styles.actionButtonText}>Modifier mon profil</ThemedText>
+            </TouchableOpacity>
+          </View>
         )}
       </ThemedView>
     </ScrollView>
@@ -478,6 +490,23 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#666',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  secondaryButton: {
+    backgroundColor: '#F0F0F5',
+    borderRadius: 10,
+    padding: 16,
+    alignItems: 'center',
+    marginVertical: 16,
+    flex: 1,
+    marginRight: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryButtonText: {
+    color: '#7667ac',
     fontWeight: 'bold',
     fontSize: 16,
   },

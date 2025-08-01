@@ -19,8 +19,7 @@ export default function CoachHomeScreen() {
         if (!user) {
           router.replace('/(tabs)');
           return;
-        }
-
+        }        
         const userDoc = await getDoc(doc(firestore, "users", user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
@@ -71,7 +70,7 @@ export default function CoachHomeScreen() {
             </View>
           </TouchableOpacity>
         </View>
-
+        
         {/* Menus principaux */}
         <View style={styles.menuContainer}>
           <TouchableOpacity style={styles.menuButton}>
@@ -83,9 +82,9 @@ export default function CoachHomeScreen() {
           
           <TouchableOpacity style={styles.menuButton}>
             <View style={styles.iconCircle}>
-              <Ionicons name="calendar" size={24} color="#7667ac" />
+              <Ionicons name="stats-chart" size={24} color="#7667ac" />
             </View>
-            <Text style={styles.menuText}>Mon Planning</Text>
+            <Text style={styles.menuText}>Statistiques</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.menuButton}>
@@ -94,57 +93,71 @@ export default function CoachHomeScreen() {
             </View>
             <Text style={styles.menuText}>Mes documents</Text>
           </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => router.push('/qr-test')}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="qr-code" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Scanner QR</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Menu secondaire avec rendez-vous */}
+        <View style={styles.secondaryMenuContainer}>
+          <TouchableOpacity 
+            style={styles.appointmentButton}
+            onPress={() => router.push('/coachDashboard')}
+          >
+            <View style={styles.appointmentIconCircle}>
+              <Ionicons name="calendar-outline" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.appointmentText}>Mes rendez-vous</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Alertes */}
-        <Text style={styles.sectionTitle}>Alertes</Text>
-        <View style={styles.alertsContainer}>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={styles.alertsContainer}>          
           <View style={styles.alertBox}>
-            <Text style={styles.alertText}>
-              5 clients en attente <Ionicons name="alert" size={16} color="orange" />
-            </Text>
-            <TouchableOpacity style={styles.viewButton}>
-              <Text style={styles.viewButtonText}>Voir</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.alertBox}>
-            <Text style={styles.alertText}>
-              2 séances à valider <Ionicons name="checkmark-circle" size={16} color="green" />
-            </Text>
-            <TouchableOpacity style={styles.viewButton}>
-              <Text style={styles.viewButtonText}>Voir</Text>
-            </TouchableOpacity>
+            <View style={styles.alertTextContainer}>
+              <Text style={styles.alertText}>
+                Bienvenue dans votre espace coach
+              </Text>
+              <Ionicons name="checkmark-circle" size={16} color="green" style={styles.alertIcon} />
+            </View>
           </View>
         </View>
 
         {/* Séances du jour */}
-        <Text style={styles.sectionTitle}>Mes séances du jour</Text>
+        <Text style={styles.sectionTitle}>Mes clients du jour</Text>
         <View style={styles.sessionsContainer}>
           <View style={styles.sessionCard}>
             <View style={styles.sessionImagePlaceholder}></View>
             <Text style={styles.clientName}>Client 1</Text>
-            <Text style={styles.sessionTime}>11:00 AM - 12:00 PM</Text>
+            <Text style={styles.sessionTime}>Programme personnalisé</Text>
           </View>
           
           <View style={styles.sessionCard}>
             <View style={styles.sessionImagePlaceholder}></View>
             <Text style={styles.clientName}>Client 3</Text>
-            <Text style={styles.sessionTime}>15:00 AM - 16:00 PM</Text>
+            <Text style={styles.sessionTime}>Suivi progression</Text>
           </View>
           
           <View style={styles.sessionCard}>
             <View style={styles.sessionImagePlaceholder}></View>
             <Text style={styles.clientName}>Client 6</Text>
-            <Text style={styles.sessionTime}>17:00 AM - 1</Text>
+            <Text style={styles.sessionTime}>Conseil nutrition</Text>
           </View>
         </View>
 
         {/* Voir séances de la semaine */}
         <TouchableOpacity style={styles.weeklySessionsButton}>
           <View style={styles.weeklySessionsContent}>
-            <Text style={styles.weeklySessionsText}>Voir mes séances de la semaine</Text>
-            <Text style={styles.weeklySessionsCount}>Vous avez 12 séances cette semaine</Text>
+            <Text style={styles.weeklySessionsText}>Voir mes clients de la semaine</Text>
+            <Text style={styles.weeklySessionsCount}>Vous suivez 12 clients cette semaine</Text>
           </View>
           <Ionicons name="chevron-forward" size={24} color="#7667ac" />
         </TouchableOpacity>
@@ -265,12 +278,14 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginVertical: 20,
   },
   menuButton: {
     alignItems: 'center',
-    width: '30%',
+    width: '22%',
+    marginBottom: 10,
   },
   iconCircle: {
     width: 60,
@@ -316,6 +331,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 15,
     textAlign: 'center',
+  },
+  alertTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertIcon: {
+    marginLeft: 8,
   },
   viewButton: {
     backgroundColor: '#7667ac',
@@ -486,5 +509,38 @@ const styles = StyleSheet.create({
   logoutText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  secondaryMenuContainer: {
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  appointmentButton: {
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 15,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  appointmentIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F0F0F5',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  appointmentText: {
+    fontSize: 13,
+    color: '#7667ac',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

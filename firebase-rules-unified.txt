@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /participants/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+      allow write: if request.auth != null && request.auth.uid in request.resource.data.members;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // SYSTÈME UNIFIÉ APPOINTMENTS (SOLO + GROUPE)
+    match /appointments/{appointmentId} {
+      // Création: autorisée pour tous les utilisateurs authentifiés
+      allow create: if request.auth != null;
+
+      // Lecture: autorisée pour tous les utilisateurs authentifiés
+      allow read: if request.auth != null;
+
+      // Mise à jour: autorisée pour tous les utilisateurs authentifiés
+      allow update: if request.auth != null;
+
+      // Suppression: autorisée pour tous les utilisateurs authentifiés
+      allow delete: if request.auth != null;
+    }
+
+    // CORRECTION: Nom de collection correct pour les participants
+    match /appointmentParticipants/{participantId} {
+      // Permettre toutes les opérations pour les utilisateurs authentifiés
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    match /coach_tags/{tagId} {
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.coachId;
+      
+      allow read: if request.auth != null;
+      
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.coachId;
+      
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.coachId;
+    }
+
+    match /contactRequests/{requestId} {
+      allow create: if request.auth != null && request.resource.data.fromId == request.auth.uid;
+
+      allow read: if request.auth != null &&
+        (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid);
+
+      allow update: if request.auth != null &&
+        resource.data.toId == request.auth.uid &&
+        request.resource.data.status in ['accepted', 'rejected'];
+
+      allow delete: if false;
+    }
+
+    // NOUVELLE COLLECTION : Invitations des rendez-vous
+    match /invitations/{invitationId} {
+      // Création : autorisée pour tous les utilisateurs authentifiés
+      allow create: if request.auth != null;
+      
+      // Lecture : autorisée pour tous les utilisateurs authentifiés (simplifiée pour debug)
+      allow read: if request.auth != null;
+      
+      // Mise à jour : autorisée pour tous les utilisateurs authentifiés
+      allow update: if request.auth != null;
+      
+      // Suppression : autorisée pour tous les utilisateurs authentifiés
+      allow delete: if request.auth != null;
+    }
+
+    // Règle par défaut - doit rester à la fin
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
