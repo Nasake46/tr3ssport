@@ -45,7 +45,9 @@ export default function QRCodeScannerWithCamera({
   useEffect(() => {
     getCameraPermissions();
     loadActiveSession();
-    
+  }, [coachId]); // Charger seulement quand le coachId change
+  
+  useEffect(() => {
     // Timer pour mettre à jour le temps de session
     const timer = setInterval(() => {
       if (activeSession) {
@@ -132,17 +134,10 @@ export default function QRCodeScannerWithCamera({
   };
 
   const loadActiveSession = async () => {
-    console.log('🔍 QR SCANNER - Chargement session active pour coach:', coachId);
     try {
       const session = await appointmentService.getActiveSessionForCoach(coachId);
-      console.log('📊 QR SCANNER - Session active trouvée:', session ? 'Oui' : 'Non');
       if (session) {
         setActiveSession(session);
-        console.log('✅ QR SCANNER - Session chargée:', {
-          appointmentId: session.appointmentId,
-          clientName: session.clientName,
-          startTime: session.startTime.toISOString()
-        });
       }
     } catch (error) {
       console.error('❌ QR SCANNER - Erreur chargement session:', error);
