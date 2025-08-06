@@ -28,6 +28,21 @@ console.log('🔍 SERVICE DEBUG - APPOINTMENTS_COLLECTION:', APPOINTMENTS_COLLEC
 console.log('🔍 SERVICE DEBUG - PARTICIPANTS_COLLECTION:', PARTICIPANTS_COLLECTION);
 
 /**
+ * Nettoie les données pour Firestore en convertissant undefined en chaîne vide
+ */
+const cleanDataForFirestore = (data: any): any => {
+  const cleaned = { ...data };
+  
+  // Convertir undefined en chaîne vide pour les champs string optionnels
+  if (cleaned.description === undefined) cleaned.description = '';
+  if (cleaned.location === undefined) cleaned.location = '';
+  if (cleaned.notes === undefined) cleaned.notes = '';
+  if (cleaned.sessionType === undefined) cleaned.sessionType = '';
+  
+  return cleaned;
+};
+
+/**
  * Crée un nouveau rendez-vous avec ses participants
  */
 export const createAppointment = async (
@@ -43,15 +58,18 @@ export const createAppointment = async (
   });
   
   try {
+    // Nettoyer les données pour éviter les valeurs undefined
+    const cleanedFormData = cleanDataForFirestore(formData);
+    
     // 1. Créer le rendez-vous principal avec addDoc (plus simple et plus fiable)
     const appointmentData: Omit<Appointment, 'id'> = {
       createdBy: userId,
-      type: formData.type,
-      sessionType: formData.sessionType,
-      description: formData.description,
-      location: formData.location,
-      date: Timestamp.fromDate(formData.date) as any,
-      notes: formData.notes,
+      type: cleanedFormData.type,
+      sessionType: cleanedFormData.sessionType,
+      description: cleanedFormData.description || '',
+      location: cleanedFormData.location || '',
+      date: Timestamp.fromDate(cleanedFormData.date) as any,
+      notes: cleanedFormData.notes || '', // Convertir undefined en chaîne vide
       globalStatus: 'pending',
       createdAt: Timestamp.now() as any,
       updatedAt: Timestamp.now() as any,
@@ -934,11 +952,18 @@ export const scanQRCode = async (qrToken: string, coachId: string): Promise<{
  * Marque manuellement la fin d'une séance
  */
 export const endSession = async (appointmentId: string, coachId: string): Promise<{success: boolean, message: string}> => {
-  console.log('⏹️ END SESSION - Fin manuelle pour RDV:', appointmentId, 'par coach:', coachId);
+  console.log('⏹️ END SESSION SERVICE - DÉBUT endSession');
+  console.log('⏹️ END SESSION SERVICE - appointmentId:', appointmentId);
+  console.log('⏹️ END SESSION SERVICE - coachId:', coachId);
+  console.log('⏹️ END SESSION SERVICE - firestore disponible:', !!firestore);
+  console.log('⏹️ END SESSION SERVICE - APPOINTMENTS_COLLECTION:', APPOINTMENTS_COLLECTION);
   
   try {
+    console.log('⏹️ END SESSION SERVICE - Création référence document...');
     const appointmentRef = doc(firestore, APPOINTMENTS_COLLECTION, appointmentId);
+    console.log('⏹️ END SESSION SERVICE - Référence créée:', appointmentRef.path);
     
+    console.log('⏹️ END SESSION SERVICE - Tentative mise à jour document...');
     await updateDoc(appointmentRef, {
       sessionEndedAt: Timestamp.now(),
       sessionEndedBy: coachId,
@@ -946,12 +971,21 @@ export const endSession = async (appointmentId: string, coachId: string): Promis
       updatedAt: Timestamp.now()
     });
     
-    console.log('✅ END SESSION - Séance terminée avec succès');
+    console.log('✅ END SESSION SERVICE - Document mis à jour avec succès');
+    console.log('✅ END SESSION SERVICE - Retour résultat success');
     return { success: true, message: 'Séance terminée avec succès !' };
     
   } catch (error) {
-    console.error('❌ END SESSION - Erreur:', error);
-    return { success: false, message: 'Erreur lors de la fin de séance' };
+    console.error('❌ END SESSION SERVICE - Erreur complète:', error);
+    console.error('❌ END SESSION SERVICE - Type erreur:', typeof error);
+    console.error('❌ END SESSION SERVICE - Message erreur:', error instanceof Error ? error.message : 'Erreur non-Error');
+    console.error('❌ END SESSION SERVICE - Stack trace:', error instanceof Error ? error.stack : 'Pas de stack');
+    console.error('❌ END SESSION SERVICE - Paramètres:', { appointmentId, coachId });
+    
+    return { 
+      success: false, 
+      message: `Erreur lors de la fin de séance: ${error instanceof Error ? error.message : 'Erreur inconnue'}` 
+    };
   }
 };
 
@@ -1039,8 +1073,11 @@ export const getQRCodeStatus = async (appointmentId: string): Promise<{
 const scheduleSessionEnd = (appointmentId: string, durationMinutes: number) => {
   console.log(`⏰ SCHEDULE END - Programmation fin auto dans ${durationMinutes} min pour RDV:`, appointmentId);
   
-  setTimeout(async () => {
+  // Programmer la fin automatique
+  const timeoutId = setTimeout(async () => {
     try {
+      console.log(`⏰ AUTO END - Vérification fin auto pour RDV:`, appointmentId);
+      
       const appointmentRef = doc(firestore, APPOINTMENTS_COLLECTION, appointmentId);
       const appointmentDoc = await getDoc(appointmentRef);
       
@@ -1057,20 +1094,29 @@ const scheduleSessionEnd = (appointmentId: string, durationMinutes: number) => {
           });
           
           console.log('✅ AUTO END - Séance terminée automatiquement:', appointmentId);
+          
+          // Notifier les clients connectés si nécessaire
+          // TODO: Ajouter notification en temps réel
+        } else {
+          console.log('ℹ️ AUTO END - Séance déjà terminée manuellement:', appointmentId);
         }
+      } else {
+        console.log('⚠️ AUTO END - RDV introuvable:', appointmentId);
       }
     } catch (error) {
       console.error('❌ AUTO END - Erreur fin automatique:', error);
     }
   }, durationMinutes * 60 * 1000);
+  
+  // Stocker l'ID du timeout pour pouvoir l'annuler si nécessaire
+  // TODO: Implémenter un système de gestion des timeouts actifs
+  console.log(`✅ SCHEDULE END - Timeout programmé avec ID:`, timeoutId);
 };
 
 /**
  * Récupère la session active pour un coach
  */
 export const getActiveSessionForCoach = async (coachId: string): Promise<any | null> => {
-  console.log('🔍 ACTIVE SESSION - Recherche session active pour coach:', coachId);
-  
   try {
     // Chercher les appointments où le coach a une session en cours
     const appointmentsQuery = query(
@@ -1082,7 +1128,6 @@ export const getActiveSessionForCoach = async (coachId: string): Promise<any | n
     const snapshot = await getDocs(appointmentsQuery);
     
     if (snapshot.empty) {
-      console.log('✅ ACTIVE SESSION - Aucune session active trouvée');
       return null;
     }
     
@@ -1098,7 +1143,7 @@ export const getActiveSessionForCoach = async (coachId: string): Promise<any | n
         clientName = userData.displayName || userData.email || 'Client';
       }
     } catch (error) {
-      console.warn('Impossible de récupérer le nom du client:', error);
+      console.warn('⚠️ Impossible de récupérer le nom du client:', error);
     }
     
     const sessionInfo = {
@@ -1109,7 +1154,6 @@ export const getActiveSessionForCoach = async (coachId: string): Promise<any | n
       actualStartTime: data.sessionStartedAt.toDate(),
     };
     
-    console.log('✅ ACTIVE SESSION - Session active trouvée:', sessionInfo);
     return sessionInfo;
     
   } catch (error) {
@@ -1117,19 +1161,4 @@ export const getActiveSessionForCoach = async (coachId: string): Promise<any | n
     return null;
   }
 };
-
-// Log de debug des exports à la fin du module
-console.log('🔍 SERVICE DEBUG - Fin du module, exports disponibles:');
-console.log('🔍 SERVICE DEBUG - testFunction définie:', typeof testFunction);
-console.log('🔍 SERVICE DEBUG - linkUserToEmailInvitations définie:', typeof linkUserToEmailInvitations);
-console.log('🔍 SERVICE DEBUG - getAllAppointmentsForClient définie:', typeof getAllAppointmentsForClient);
-console.log('🔍 SERVICE DEBUG - getInvitationsForCalendar définie:', typeof getInvitationsForCalendar);
-console.log('🔍 SERVICE DEBUG - addJitsiLinkToAppointment définie:', typeof addJitsiLinkToAppointment);
-console.log('🔍 SERVICE DEBUG - getJitsiLinkFromAppointment définie:', typeof getJitsiLinkFromAppointment);
-console.log('🔍 SERVICE DEBUG - generateQRCodeForAppointment définie:', typeof generateQRCodeForAppointment);
-console.log('🔍 SERVICE DEBUG - scanQRCode définie:', typeof scanQRCode);
-console.log('🔍 SERVICE DEBUG - endSession définie:', typeof endSession);
-console.log('🔍 SERVICE DEBUG - canGenerateQRCode définie:', typeof canGenerateQRCode);
-console.log('🔍 SERVICE DEBUG - getQRCodeStatus définie:', typeof getQRCodeStatus);
-console.log('🔍 SERVICE DEBUG - getActiveSessionForCoach définie:', typeof getActiveSessionForCoach);
 console.log('🔍 SERVICE DEBUG - getAppointmentById définie:', typeof getAppointmentById);

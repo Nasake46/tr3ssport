@@ -96,12 +96,42 @@ export default function CoachHomeScreen() {
           
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => router.push('/qr-test')}
+            onPress={() => router.push('/qr-scanner')}
           >
             <View style={styles.iconCircle}>
               <Ionicons name="qr-code" size={24} color="#7667ac" />
             </View>
             <Text style={styles.menuText}>Scanner QR</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => router.push('/simple-stop-test')}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="stop-circle" size={24} color="#e74c3c" />
+            </View>
+            <Text style={styles.menuText}>Test Stop Simple</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => router.push('/debug-end-session')}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="bug" size={24} color="#e74c3c" />
+            </View>
+            <Text style={styles.menuText}>Debug Session</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => router.push('/test-services')}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="flask" size={24} color="#f39c12" />
+            </View>
+            <Text style={styles.menuText}>Test Services</Text>
           </TouchableOpacity>
         </View>
 
