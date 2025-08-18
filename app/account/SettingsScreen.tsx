@@ -1,0 +1,103 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { auth, firestore } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { styles } from '../styles/account/SettingsScreen.styles';
+
+export default function SettingsScreen() {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('+33 6 12 34 56 78');
+  const [address, setAddress] = useState('123 Rue Exemple, Paris');
+  const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(firestore, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFirstName(data.firstName);
+          setLastName(data.lastName);
+          setEmail(data.email);
+        }
+      }
+    });
+
+      return () => unsubscribe();
+}, []);
+
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Paramètres du compte</Text>
+
+        <View style={styles.fieldBlock}>
+          <Text style={styles.label}>Prénom</Text>
+          <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
+        </View>
+        <View style={styles.line} />
+
+        <View style={styles.fieldBlock}>
+          <Text style={styles.label}>Nom</Text>
+          <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
+        </View>
+        <View style={styles.line} />
+
+        <View style={styles.fieldBlock}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+          />
+        </View>
+        <View style={styles.line} />
+
+        <View style={styles.fieldBlock}>
+          <Text style={styles.label}>Téléphone</Text>
+          <TextInput
+            style={styles.input}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
+        </View>
+        <View style={styles.line} />
+
+        <View style={styles.fieldBlock}>
+          <Text style={styles.label}>Adresse</Text>
+          <TextInput style={styles.input} value={address} onChangeText={setAddress} />
+        </View>
+        <View style={styles.line} />
+
+        <View style={styles.fieldBlock}>
+          <Text style={styles.label}>Mot de passe</Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="********"
+          />
+        </View>
+
+        <TouchableOpacity style={styles.saveButton}>
+          <Text style={styles.saveText}>Enregistrer</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}

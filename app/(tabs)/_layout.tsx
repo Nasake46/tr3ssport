@@ -1,10 +1,9 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
@@ -15,58 +14,83 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarShowLabel: false,
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
+        tabBarStyle: {
+          position: 'absolute',
+          left: 20,
+          right: 20,
+          backgroundColor: '#fff',
+          borderRadius: 30,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.50,
+          shadowRadius: 10,
+          elevation: 10,
+          overflow: 'hidden',
+          alignItems: 'center',
+          flexDirection: 'row',
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Launch',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol name="paperplane.fill" size={28} color={color} />
+          ),
         }}
       />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="homeCoach"
-        options={{
-          title: 'Coach Dashboard',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-          // Optionnel : Masquer cet onglet dans la barre de navigation
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="profilCoach"
-        options={{
-          title: 'Mon Profil',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-          // Ne pas l'afficher dans la barre de navigation si on veut y accéder uniquement depuis le tableau de bord coach
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-      name="events"
-      options={{
-        title: 'Événements',
-        tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
-        }}
-      />
+<Tabs.Screen
+  name="HomeScreen"
+  options={{
+    title: 'Home',
+    tabBarIcon: ({ focused }) => (
+      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        {focused && (
+          <View
+            style={{
+              position: 'absolute',
+              top: -20,
+              width: 60,
+              height: 60,
+              backgroundColor: '#fff',
+              borderRadius: 30,
+              zIndex: 0,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 6,
+              elevation: 6,
+            }}
+          />
+        )}
+        <Image
+          source={require('@/assets/images/logoT.png')}
+          style={{
+            width: 32,
+            height: 32,
+            resizeMode: 'contain',
+            zIndex: 1,
+            marginTop: focused ? -5 : 0,
+          }}
+        />
+      </View>
+    ),
+  }}
+/>
 
+      <Tabs.Screen
+        name="ProfileScreen"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol name="person.fill" size={28} color={color} />
+          ),
+        }}
+      />
     </Tabs>
-    
   );
 }
