@@ -15,11 +15,16 @@ import { useSessionTimer } from '@/hooks/useSessionTimer';
 import { auth } from '@/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import QRCodeScannerOptimized from '@/components/qr/QRCodeScannerOptimized';
+import { backOrRoleHome } from '@/services/navigationService';
+import PerformanceTestForm from '@/components/performance/PerformanceTestForm';
+import * as performanceTestService from '@/services/performanceTestService';
 
 export default function QRScannerScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showEmergencyStop, setShowEmergencyStop] = useState(false);
+  const [showTestForm, setShowTestForm] = useState(false);
+  const [lastEndedInfo, setLastEndedInfo] = useState<{ appointmentId: string; clientId: string } | null>(null);
   
   // Gérer l'authentification
   useEffect(() => {
@@ -37,7 +42,11 @@ export default function QRScannerScreen() {
     loadActiveSession,
     endSession,
     endSessionWithConfirmation
-  } = useActiveSession(currentUser?.uid || '');
+  } = useActiveSession(currentUser?.uid || '', (appointmentId, coachId, clientId) => {
+    // Callback appelé après fin de séance réussie → ouvrir le formulaire
+    setLastEndedInfo({ appointmentId, clientId });
+    setShowTestForm(true);
+  });
   
   const { sessionTime, totalSeconds } = useSessionTimer(activeSession);
 
@@ -126,6 +135,17 @@ export default function QRScannerScreen() {
     );
   };
 
+  const handleSubmitPerformanceTest = async (input: any) => {
+    if (!currentUser || !lastEndedInfo) return;
+    try {
+      await performanceTestService.createPerformanceTest(input);
+      setShowTestForm(false);
+      Alert.alert('Test enregistré', 'Le test de performance a été enregistré avec succès.');
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message || 'Impossible d\'enregistrer le test');
+    }
+  };
+
   if (authLoading) {
     return (
       <View style={styles.container}>
@@ -143,7 +163,7 @@ export default function QRScannerScreen() {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => backOrRoleHome('coach')}
           >
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
@@ -173,7 +193,7 @@ export default function QRScannerScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => backOrRoleHome('coach')}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -266,13 +286,26 @@ export default function QRScannerScreen() {
         </View>
       )}
 
-      {/* Composant de scan QR */}
+      {/* Contenu principal */}
       <ScrollView style={styles.content}>
-        <QRCodeScannerOptimized
-          coachId={currentUser.uid}
-          onSessionStarted={handleSessionStarted}
-          onSessionEnded={handleSessionEnded}
-        />
+        {/* Scanner QR tant que pas de formulaire */}
+        {!showTestForm && (
+          <QRCodeScannerOptimized
+            coachId={currentUser.uid}
+            onSessionStarted={handleSessionStarted}
+            onSessionEnded={handleSessionEnded}
+          />
+        )}
+
+        {/* Formulaire de test de performance après fin de séance */}
+        {showTestForm && lastEndedInfo && (
+          <PerformanceTestForm
+            appointmentId={lastEndedInfo.appointmentId}
+            userId={lastEndedInfo.clientId}
+            coachId={currentUser.uid}
+            onSubmit={handleSubmitPerformanceTest}
+          />
+        )}
       </ScrollView>
 
       {/* Footer avec instructions d'urgence */}

@@ -3,8 +3,33 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     match /users/{userId} {
+  // Lecture ouverte à tout utilisateur authentifié (inclut observateurs)
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // Création : uniquement par l'utilisateur lui‑même, rôle limité (anti auto-création admin)
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.role in ['user', 'coach'];
+
+    // Mise à jour :
+    //  - Soit l'utilisateur modifie SON document sans changer son propre rôle
+    //  - Soit un admin (selon son doc utilisateur) peut modifier n'importe quel utilisateur y compris le rôle
+    //  - Un observateur n'a aucun droit d'écriture
+      allow update: if request.auth != null && (
+        (
+          request.auth.uid == userId &&
+          // Empêche un user/coach de s'auto-promouvoir (le rôle ne change pas)
+          request.resource.data.role == resource.data.role
+        ) || (
+          // Admin identifié via son document utilisateur
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+    ) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'observer';
+
+      // Suppression : réservée aux admins (ou auto‑suppression possible si besoin -> à activer si souhaité)
+      allow delete: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
     }
 
     match /participants/{userId} {
@@ -80,6 +105,32 @@ service cloud.firestore {
       
       // Suppression : autorisée pour tous les utilisateurs authentifiés
       allow delete: if request.auth != null;
+    }
+
+    // Demandes d'agrément des coachs
+    match /coachApplications/{applicationId} {
+      // Création par un utilisateur authentifié (sa propre candidature)
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Lecture : admin seulement (ou le propriétaire de sa propre demande si besoin)
+      allow read: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        || resource.data.userId == request.auth.uid
+      );
+      // Mise à jour/Suppression : réservé aux admins
+      allow update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Liste des bannissements (archives)
+    match /bans/{banId} {
+      // Création/Lecture/Mise à jour/Suppression : réservées aux admins
+      // Lecture autorisée aussi aux observateurs (lecture seule)
+      allow create, update, delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'observer'
+      );
     }
 
     // Règle par défaut - doit rester à la fin

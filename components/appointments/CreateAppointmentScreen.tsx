@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Coach } from '@/models/coach';
 import { auth, firestore } from '@/firebase';
 import { collection, addDoc, Timestamp, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { backOrRoleHome } from '@/services/navigationService';
 
 // Fonction pour vérifier qu'un email appartient à un utilisateur inscrit
 const verifyUserEmail = async (email: string): Promise<{ exists: boolean; userData?: any }> => {
@@ -258,7 +259,7 @@ export default function CreateAppointmentScreen() {
     sessionType: '',
     description: '',
     location: '',
-    date: new Date(Date.now() + 60 * 60 * 1000), // Dans 1 heure par défaut
+    date: new Date(Date.now() + 30 * 60 * 1000), // Dans 30 minutes par défaut
     duration: 60, // 60 minutes par défaut
     notes: '',
     coachIds: [],
@@ -279,7 +280,7 @@ export default function CreateAppointmentScreen() {
         [
           {
             text: 'OK',
-            onPress: () => router.back()
+            onPress: () => backOrRoleHome('user')
           }
         ]
       );
@@ -540,7 +541,7 @@ export default function CreateAppointmentScreen() {
             text: 'OK',
             onPress: () => {
               console.log('🔄 CRÉATION RDV - Retour au dashboard');
-              router.back();
+              backOrRoleHome('user');
             }
           }
         ]

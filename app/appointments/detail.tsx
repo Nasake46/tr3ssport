@@ -14,6 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { auth, firestore } from '@/firebase';
 import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
+import { backOrRoleHome } from '@/services/navigationService';
 
 // Types pour les rendez-vous
 interface Appointment {
@@ -60,12 +61,29 @@ export default function AppointmentDetail() {
 
   useEffect(() => {
     if (!appointmentId || !currentUser) {
-      router.back();
+      backOrRoleHome();
       return;
     }
 
     loadAppointmentDetail();
   }, [appointmentId, currentUser]);
+
+  const safeToDate = (value: any): Date | null => {
+    if (!value) return null;
+    // Firestore Timestamp
+    if (typeof value?.toDate === 'function') return value.toDate();
+    // Déjà une Date
+    if (value instanceof Date) return value;
+    // Chaîne ou nombre convertible
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const formatDecisionDate = (value: any): string | null => {
+    const d = safeToDate(value);
+    if (!d) return null;
+    return `Le ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+  };
 
   const loadAppointmentDetail = async () => {
     try {
@@ -76,11 +94,23 @@ export default function AppointmentDetail() {
       
       if (!appointmentDoc.exists()) {
         Alert.alert('Erreur', 'Rendez-vous introuvable');
-        router.back();
+        backOrRoleHome();
         return;
       }
 
-      const data = appointmentDoc.data();
+      const data = appointmentDoc.data() as any;
+
+      // Normaliser les décisions pour convertir respondedAt en Date
+      const rawDecisions = (data.decisions || {}) as Record<string, any>;
+      const normalizedDecisions: { [coachId: string]: CoachDecision } = {};
+      for (const [coachId, dec] of Object.entries(rawDecisions)) {
+        normalizedDecisions[coachId] = {
+          status: dec?.status,
+          comment: dec?.comment || '',
+          respondedAt: safeToDate(dec?.respondedAt) || new Date(),
+        } as CoachDecision;
+      }
+
       const appointmentData: Appointment = {
         id: appointmentDoc.id,
         type: data.type,
@@ -92,7 +122,7 @@ export default function AppointmentDetail() {
         date: data.date?.toDate() || new Date(),
         status: data.status || 'pending',
         createdAt: data.createdAt?.toDate() || new Date(),
-        decisions: data.decisions || {},
+        decisions: normalizedDecisions,
         invitedEmails: data.invitedEmails || [],
         notes: data.notes || ''
       };
@@ -135,7 +165,7 @@ export default function AppointmentDetail() {
     } catch (error) {
       console.error('❌ APPOINTMENT DETAIL - Erreur:', error);
       Alert.alert('Erreur', 'Impossible de charger les détails du rendez-vous');
-      router.back();
+      backOrRoleHome();
     } finally {
       setLoading(false);
     }
@@ -191,7 +221,7 @@ export default function AppointmentDetail() {
         [
           {
             text: 'OK',
-            onPress: () => router.back()
+            onPress: () => backOrRoleHome()
           }
         ]
       );
@@ -253,13 +283,14 @@ export default function AppointmentDetail() {
   }
 
   const myDecision = getMyDecision();
+  const myDecisionDateLabel = formatDecisionDate(myDecision?.respondedAt);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => backOrRoleHome()}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -383,9 +414,11 @@ export default function AppointmentDetail() {
                   {myDecision.status === 'accepted' ? 'Accepté' : 'Refusé'}
                 </Text>
               </View>
-              <Text style={styles.responseDate}>
-                Le {myDecision.respondedAt.toLocaleDateString('fr-FR')} à {myDecision.respondedAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-              </Text>
+              {myDecisionDateLabel && (
+                <Text style={styles.responseDate}>
+                  {myDecisionDateLabel}
+                </Text>
+              )}
             </View>
             {myDecision.comment && (
               <View style={styles.commentContainer}>

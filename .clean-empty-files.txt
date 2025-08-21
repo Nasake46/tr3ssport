@@ -1,0 +1,30 @@
+This file was created to track the cleanup operation of empty files.
+The following files were identified as empty and safe to delete (outside node_modules and ignoring .gitkeep):
+- app/(tabs)/bookAppointment.tsx
+- app/(tabs)/coachAppointmentRequests-new.tsx
+- app/(tabs)/coachAppointmentRequests.tsx
+- app/(tabs)/coachSchedule.tsx
+- app/(tabs)/myAppointments-new.tsx
+- app/(tabs)/myAppointments.tsx
+- app/(tabs)/test-new-system.tsx
+- app/(tabs)/userAppointmentRequests.tsx
+- APPOINTMENT_SYSTEM_GUIDE.md
+- COACH_APPROVAL_TESTING.md
+- components/AcceptAppointmentModal.tsx
+- components/appointments/AppointmentNotification.tsx
+- components/appointments/AppointmentQuickAccess.tsx
+- components/appointments/CoachPendingRequests.tsx
+- components/appointments/DebugLogger.tsx
+- components/appointments/index.ts
+- components/appointments/InviteScreen.tsx
+- components/BookingFormModal.tsx
+- DEBUG_CREATION_RDV.md
+- firebase-rules.txt
+- firestore.rules
+- INTEGRATION_GUIDE.md
+- NOUVEAU-SYSTEME-UNIFIE.md
+- services/appointmentService-new.ts
+- services/appointmentService.backup.ts
+- test-tags.ts
+
+Proceeding to delete these files next.

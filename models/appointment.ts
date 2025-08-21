@@ -10,6 +10,9 @@ export interface Appointment {
   globalStatus: 'pending' | 'confirmed' | 'declined';
   createdAt: Date;
   updatedAt: Date;
+  // Nouveau: stockage direct pour requêtes rapides
+  coachIds?: string[]; // liste des coachs liés
+  participantsIds?: string[]; // liste des userId connus (créateur + coachs + clients identifiés)
 }
 
 export interface AppointmentParticipant {

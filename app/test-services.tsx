@@ -9,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as appointmentService from '@/services/appointmentService';
+import { backOrRoleHome } from '@/services/navigationService';
 
 export default function TestEndSessionScreen() {
   const testServiceFunctions = async () => {
@@ -47,7 +48,7 @@ export default function TestEndSessionScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => backOrRoleHome()}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>

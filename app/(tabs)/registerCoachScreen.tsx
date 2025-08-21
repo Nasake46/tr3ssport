@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TextInput, Button, StyleSheet, View, Alert, Text, ScrollView } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, firestore } from '../../firebase';
 import { useRouter } from 'expo-router';
 
@@ -28,6 +28,7 @@ export default function RegisterCoachScreen() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
+      // 1) Créer / mettre à jour le document utilisateur avec rôle par défaut 'user'
       await setDoc(doc(firestore, "users", user.uid), {
         firstName,
         lastName,
@@ -37,15 +38,31 @@ export default function RegisterCoachScreen() {
         companyName,
         siretNumber,
         diploma,
-        role: "coach",
-        createdAt: new Date()
+        role: "user",
+        createdAt: serverTimestamp(),
+        coachApplicationStatus: 'pending',
+      }, { merge: true });
+
+      // 2) Créer une demande d'approbation coach
+      await addDoc(collection(firestore, 'coachApplications'), {
+        userId: user.uid,
+        email,
+        firstName,
+        lastName,
+        phoneNumber,
+        address,
+        companyName,
+        siretNumber,
+        diploma,
+        status: 'pending',
+        createdAt: serverTimestamp(),
       });
-      
-      console.log('Coach enregistré:', user);
-      Alert.alert('Succès', 'Votre compte coach a été créé avec succès !', [
+
+      console.log('Demande coach créée pour:', user.uid);
+      Alert.alert('Demande envoyée', "Votre demande d'inscription coach a été transmise. Un administrateur va l'examiner.", [
         { 
           text: 'OK', 
-          onPress: () => router.push('/(tabs)/LoginScreen') 
+          onPress: () => router.push('/(tabs)/LoginScreen')
         }
       ]);
       

@@ -10,34 +10,65 @@ export default function CoachHomeScreen() {
   const router = useRouter();
   const [coachData, setCoachData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isRouterReady, setIsRouterReady] = useState(false);
 
   useEffect(() => {
-    // Récupérer les données du coach
-    const fetchCoachData = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) {
+    // Attendre que le router soit prêt
+    const timer = setTimeout(() => {
+      setIsRouterReady(true);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const navigateToPage = (path: string) => {
+    if (!isRouterReady) {
+      setTimeout(() => navigateToPage(path), 100);
+      return;
+    }
+    try {
+      router.push(path as any);
+    } catch (error) {
+      console.error('Erreur de navigation:', error);
+    }
+  };
+
+  // Récupérer les données du coach
+  const fetchCoachData = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        router.replace('/(tabs)');
+        return;
+      }        
+      
+      console.log('🔄 COACH HOME - Récupération données utilisateur:', user.uid);
+      const userDoc = await getDoc(doc(firestore, "users", user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        console.log('📋 COACH HOME - Données utilisateur:', userData);
+        console.log('🎭 COACH HOME - Rôle utilisateur:', userData.role);
+        
+        if (userData.role !== 'coach' && userData.role !== 'admin') {
           router.replace('/(tabs)');
           return;
-        }        
-        const userDoc = await getDoc(doc(firestore, "users", user.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          if (userData.role !== 'coach') {
-            router.replace('/(tabs)');
-            return;
-          }
-          setCoachData(userData);
-        } else {
-          router.replace('/(tabs)');
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des données:", error);
-      } finally {
-        setLoading(false);
+        setCoachData(userData);
+        // Vérifier si l'utilisateur est admin
+        setIsAdmin(userData.role === 'admin');
+        console.log('🔐 COACH HOME - Est admin:', userData.role === 'admin');
+      } else {
+        router.replace('/(tabs)');
       }
-    };
+    } catch (error) {
+      console.error("❌ COACH HOME - Erreur lors de la récupération des données:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchCoachData();
   }, [router]);
 
@@ -96,7 +127,7 @@ export default function CoachHomeScreen() {
           
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => router.push('/qr-scanner')}
+            onPress={() => router.push('/qr-scanner' as any)}
           >
             <View style={styles.iconCircle}>
               <Ionicons name="qr-code" size={24} color="#7667ac" />
@@ -106,7 +137,7 @@ export default function CoachHomeScreen() {
           
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => router.push('/simple-stop-test')}
+            onPress={() => router.push('/simple-stop-test' as any)}
           >
             <View style={styles.iconCircle}>
               <Ionicons name="stop-circle" size={24} color="#e74c3c" />
@@ -116,7 +147,7 @@ export default function CoachHomeScreen() {
           
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => router.push('/debug-end-session')}
+            onPress={() => router.push('/debug-end-session' as any)}
           >
             <View style={styles.iconCircle}>
               <Ionicons name="bug" size={24} color="#e74c3c" />
@@ -126,12 +157,50 @@ export default function CoachHomeScreen() {
           
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => router.push('/test-services')}
+            onPress={() => router.push('/test-services' as any)}
           >
             <View style={styles.iconCircle}>
               <Ionicons name="flask" size={24} color="#f39c12" />
             </View>
             <Text style={styles.menuText}>Test Services</Text>
+          </TouchableOpacity>
+          
+          {/* Bouton Admin - visible uniquement pour les admins */}
+          {isAdmin && (
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={() => navigateToPage('/admin-dashboard')}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: '#ff6b6b' }]}>
+                <Ionicons name="shield-checkmark" size={24} color="#fff" />
+              </View>
+              <Text style={styles.menuText}>Admin</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Utilitaire Setup Admin - temporaire pour tests */}
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => navigateToPage('/admin-setup')}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: '#ffc107' }]}>
+              <Ionicons name="settings" size={24} color="#fff" />
+            </View>
+            <Text style={styles.menuText}>Setup Admin</Text>
+          </TouchableOpacity>
+
+          {/* Bouton Refresh - pour recharger les données */}
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => {
+              setLoading(true);
+              fetchCoachData();
+            }}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: '#17a2b8' }]}>
+              <Ionicons name="refresh" size={24} color="#fff" />
+            </View>
+            <Text style={styles.menuText}>Rafraîchir</Text>
           </TouchableOpacity>
         </View>
 

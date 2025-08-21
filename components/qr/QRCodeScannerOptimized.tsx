@@ -8,10 +8,12 @@ import {
   TextInput,
   ActivityIndicator,
   Modal,
-  Dimensions
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BarCodeScanner } from 'expo-barcode-scanner';
+import { CameraView, Camera } from 'expo-camera';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 
@@ -34,6 +36,9 @@ export default function QRCodeScannerOptimized({
   const [showEndConfirmModal, setShowEndConfirmModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [modalMessage, setModalMessage] = useState({ title: '', message: '', type: 'info' as 'info' | 'success' | 'error' });
+  const isWeb = Platform.OS === 'web';
+  // Ajout: orientation caméra avec fallback (web/desktop)
+  const [cameraFacing, setCameraFacing] = useState<'back' | 'front'>('back');
   
   // Utilisation des hooks personnalisés
   const {
@@ -75,11 +80,19 @@ export default function QRCodeScannerOptimized({
   const getCameraPermissions = async () => {
     try {
       console.log('📷 CAMÉRA - Demande de permissions...');
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      let status: string | undefined;
+
+      if (isWeb) {
+        const result = await Camera.requestCameraPermissionsAsync();
+        status = result.status;
+      } else {
+        const result = await BarCodeScanner.requestPermissionsAsync();
+        status = result.status;
+      }
+
       console.log('📷 CAMÉRA - Statut permission:', status);
-      
       setHasPermission(status === 'granted');
-      
+
       if (status === 'granted') {
         console.log('✅ CAMÉRA - Permissions accordées');
         setCameraError(null);
@@ -97,6 +110,18 @@ export default function QRCodeScannerOptimized({
   const checkCameraAvailability = async () => {
     try {
       console.log('📷 CAMÉRA - Vérification basique...');
+      
+      // Vérifier le contexte sécurisé sur le web (HTTPS requis hors localhost)
+      if (isWeb && typeof window !== 'undefined') {
+        const host = window.location.hostname;
+        const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        if (!window.isSecureContext && !isLocal) {
+          const msg = 'Le navigateur bloque la caméra car le site n\'est pas en HTTPS. Ouvrez le site en HTTPS (ou en localhost).';
+          console.warn('⚠️ CAMÉRA - Contexte non sécurisé:', { host, isSecureContext: window.isSecureContext });
+          setCameraError(msg);
+          return false;
+        }
+      }
       
       // Test simple pour voir si on peut utiliser la caméra
       if (typeof window !== 'undefined' && navigator.mediaDevices) {
@@ -461,13 +486,46 @@ export default function QRCodeScannerOptimized({
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
             <Text style={styles.scannerModalTitle}>Scanner QR Code</Text>
-            <View style={{ width: 24 }} />
+            {/* Ajout: bouton flip caméra en web */}
+            {isWeb ? (
+              <TouchableOpacity onPress={() => setCameraFacing(prev => prev === 'back' ? 'front' : 'back')} style={styles.closeButton}>
+                <Ionicons name="camera-reverse" size={24} color="white" />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 24 }} />
+            )}
           </View>
 
-          <BarCodeScanner
-            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-            style={StyleSheet.absoluteFillObject}
-          />
+          {isWeb ? (
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing={cameraFacing}
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              // @ts-ignore - onMountError n'est pas toujours typé
+              onMountError={(e: any) => {
+                console.error('❌ CAMÉRA (web) - Erreur montage:', e);
+                // Fallback: essayer la caméra frontale si la back échoue
+                if (cameraFacing === 'back') {
+                  console.warn('🔁 CAMÉRA (web) - Fallback vers la caméra frontale');
+                  setCameraFacing('front');
+                  setCameraError('Impossible d\'ouvrir la caméra arrière, tentative avec la caméra avant...');
+                } else {
+                  setCameraError(e?.message || 'Erreur caméra inconnue');
+                }
+              }}
+              // @ts-ignore - onCameraReady non typé selon versions
+              onCameraReady={() => {
+                console.log('✅ CAMÉRA (web) - Prête, facing =', cameraFacing);
+                setCameraError(null);
+              }}
+            />
+          ) : (
+            <BarCodeScanner
+              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+              style={StyleSheet.absoluteFillObject}
+            />
+          )}
 
           <View style={styles.scannerOverlay}>
             <View style={styles.scannerFrame} />
@@ -480,6 +538,18 @@ export default function QRCodeScannerOptimized({
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="white" />
               <Text style={styles.loadingText}>Validation en cours...</Text>
+            </View>
+          )}
+
+          {!!cameraError && (
+            <View style={styles.loadingOverlay}>
+              <Text style={styles.loadingText}>⚠️ {cameraError}</Text>
+              <TouchableOpacity
+                style={[styles.modalButton, { marginTop: 16 }]}
+                onPress={() => setScanning(false)}
+              >
+                <Text style={styles.modalButtonText}>Fermer</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>

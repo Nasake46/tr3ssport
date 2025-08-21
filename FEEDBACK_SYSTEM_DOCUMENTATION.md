@@ -187,6 +187,25 @@ Structure des documents :
 }
 ```
 
+# Saisie de tests de performance (post-séance)
+
+Après la fin d'une séance, le coach peut créer un test de performance attaché au client et au rendez-vous:
+
+Champs:
+- Famille: Cardio-vasculaire, Mobilité et Souplesse, Force & Tonicité, Fonctionnels, Posture et Stabilité
+- Nom du test
+- Unité de mesure: longueurs, masses, capacités/volumes, temps, aires, %, degrés, fréquence, vitesse, watt, ou sans unité
+- Valeur numérique (optionnel) et/ou valeur texte (optionnel)
+- Date du test
+
+Stockage:
+- Collection `performanceTests`
+- Clés: appointmentId, userId (client), coachId, family, testName, unitType, unitLabel, valueNumber, valueText, testDate, createdAt
+
+UI:
+- Composant `components/performance/PerformanceTestForm.tsx`
+- Service `services/performanceTestService.ts`
+
 ## Extensions Possibles
 
 - Notifications push pour les feedbacks en attente
