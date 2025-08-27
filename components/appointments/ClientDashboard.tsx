@@ -14,6 +14,7 @@ import { auth, firestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { getAllAppointmentsForClient } from '@/services/appointmentService';
+import AppointmentDetailModal from '@/components/appointments/AppointmentDetailModal';
 
 // Types pour les rendez-vous
 interface Appointment {
@@ -29,6 +30,8 @@ interface Appointment {
   createdAt: Date;
   decisions: { [coachId: string]: CoachDecision };
   coachesInfo?: CoachInfo[];
+  // Optionnel si disponible dans les données d'origine
+  duration?: number;
 }
 
 interface CoachDecision {
@@ -47,6 +50,8 @@ export default function ClientDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   const currentUser = auth.currentUser;
 
@@ -284,6 +289,23 @@ export default function ClientDashboard() {
         </View>
 
         <Text style={styles.overallStatusText}>{overallStatus.text}</Text>
+
+        {/* Bouton Détails/QR */}
+        <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+          <TouchableOpacity
+            style={styles.detailsButton}
+            onPress={() => {
+              // Ancien: modal local
+              // setSelectedAppointment(appointment);
+              // setDetailVisible(true);
+              // Nouveau: redirection vers la page QR dédiée
+              router.push({ pathname: '/appointments/qr', params: { appointmentId: appointment.id } } as any);
+            }}
+          >
+            <Ionicons name="qr-code-outline" size={18} color="#fff" />
+            <Text style={styles.detailsButtonText}>Détails / QR</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -355,6 +377,22 @@ export default function ClientDashboard() {
           </View>
         )}
       </ScrollView>
+
+      {/* Modal de détails/QR */}
+      {selectedAppointment && (
+        <AppointmentDetailModal
+          visible={false}
+          onClose={() => setDetailVisible(false)}
+          appointment={{
+            id: selectedAppointment.id,
+            title: selectedAppointment.sessionType || 'Rendez-vous',
+            date: selectedAppointment.date,
+            duration: selectedAppointment.duration,
+            status: selectedAppointment.status as any,
+            coachName: selectedAppointment.coachesInfo?.map(c => c.name).join(', '),
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -549,5 +587,19 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  detailsButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailsButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 6,
   },
 });

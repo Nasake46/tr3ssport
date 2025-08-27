@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { TextInput, Text, TouchableOpacity, StyleSheet, View, Alert } from 'react-native';
+import { TextInput, Button, StyleSheet, View, Alert, Text, ScrollView } from 'react-native';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { auth, firestore } from '../../firebase';
+import { useRouter } from 'expo-router';
 
 export default function RegisterCoachScreen() {
   const [firstName, setFirstName] = useState('');
@@ -11,16 +15,69 @@ export default function RegisterCoachScreen() {
   const [siretNumber, setSiretNumber] = useState('');
   const [diploma, setDiploma] = useState('');
 
-  const handleRegister = () => {
-    console.log('Prénom:', firstName);
-    console.log('Nom:', lastName);
-    console.log('Email:', email);
-    console.log('Téléphone:', phone);
-    console.log('Adresse:', address);
-    console.log('Nom de la société:', companyName);
-    console.log('Numéro de SIRET:', siretNumber);
-    console.log('Diplôme:', diploma);
-    Alert.alert('Succès', 'Inscription réussie');
+  const handleRegister = async () => {
+    if (!email || !password) {
+      setErrorMessage('Veuillez entrer votre email et votre mot de passe.');
+      return;
+    }
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // 1) Créer / mettre à jour le document utilisateur avec rôle par défaut 'user'
+      await setDoc(doc(firestore, "users", user.uid), {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        address,
+        companyName,
+        siretNumber,
+        diploma,
+        role: "user",
+        createdAt: serverTimestamp(),
+        coachApplicationStatus: 'pending',
+      }, { merge: true });
+
+      // 2) Créer une demande d'approbation coach
+      await addDoc(collection(firestore, 'coachApplications'), {
+        userId: user.uid,
+        email,
+        firstName,
+        lastName,
+        phoneNumber,
+        address,
+        companyName,
+        siretNumber,
+        diploma,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+
+      console.log('Demande coach créée pour:', user.uid);
+      Alert.alert('Demande envoyée', "Votre demande d'inscription coach a été transmise. Un administrateur va l'examiner.", [
+        { 
+          text: 'OK', 
+          onPress: () => router.push('/(tabs)/LoginScreen')
+        }
+      ]);
+      
+      setEmail('');
+      setPassword('');
+      setPhoneNumber('');
+      setFirstName('');
+      setLastName('');
+      setAddress('');
+      setCompanyName('');
+      setSiretNumber('');
+      setDiploma('');
+      setErrorMessage(null);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'inscription:', error);
+      setErrorMessage(error.message);
+      Alert.alert('Erreur', `L'inscription a échoué : ${error.message}`);
+    }
   };
 
   return (

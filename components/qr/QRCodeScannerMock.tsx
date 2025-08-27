@@ -56,10 +56,8 @@ export default function QRCodeScannerMock({
   }, [activeSession]);
 
   const loadActiveSession = async () => {
-    console.log('🔍 QR SCANNER - Chargement session active pour coach:', coachId);
     try {
       const session = await appointmentService.getActiveSessionForCoach(coachId);
-      console.log('📊 QR SCANNER - Session active trouvée:', session ? 'Oui' : 'Non');
       if (session) {
         setActiveSession(session);
         console.log('✅ QR SCANNER - Session chargée:', {

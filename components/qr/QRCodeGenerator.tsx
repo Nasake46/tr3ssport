@@ -17,13 +17,15 @@ interface QRCodeGeneratorProps {
   appointmentDate: Date;
   duration?: number;
   onQRGenerated?: (token: string) => void;
+  onTokenAvailable?: (token: string) => void; // Nouveau callback pour token immédiatement disponible
 }
 
 export default function QRCodeGenerator({ 
   appointmentId, 
   appointmentDate, 
   duration = 60,
-  onQRGenerated 
+  onQRGenerated,
+  onTokenAvailable 
 }: QRCodeGeneratorProps) {
   const [qrToken, setQrToken] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -60,6 +62,14 @@ export default function QRCodeGenerator({
     return () => clearInterval(timer);
   }, [status]);
 
+  // Exposer le token via l'état et la prop onTokenAvailable
+  useEffect(() => {
+    if (qrToken && onTokenAvailable) {
+      console.log('📱 QR GENERATOR - Token disponible exposé:', qrToken.substring(0, 20) + '...');
+      onTokenAvailable(qrToken);
+    }
+  }, [qrToken, onTokenAvailable]);
+
   const checkQRStatus = async () => {
     console.log('🔍 QR GENERATOR - Vérification du statut pour:', appointmentId);
     try {
@@ -74,7 +84,9 @@ export default function QRCodeGenerator({
         console.log('📋 QR GENERATOR - Appointment récupéré:', appointment ? 'Trouvé' : 'Non trouvé');
         if (appointment && (appointment as any).qrToken) {
           console.log('✅ QR GENERATOR - Token récupéré:', (appointment as any).qrToken.substring(0, 20) + '...');
-          setQrToken((appointment as any).qrToken);
+          const token = (appointment as any).qrToken;
+          setQrToken(token);
+          onTokenAvailable?.(token); // Nouveau callback
         }
       }
       
@@ -102,6 +114,7 @@ export default function QRCodeGenerator({
       console.log('✅ QR GENERATOR - Token auto-généré:', token.substring(0, 20) + '...');
       setQrToken(token);
       onQRGenerated?.(token);
+      onTokenAvailable?.(token); // Nouveau callback
       console.log('✅ QR GENERATOR - Auto-génération réussie');
     } catch (error) {
       console.error('❌ QR GENERATOR - Erreur auto-génération:', error);
@@ -166,6 +179,7 @@ export default function QRCodeGenerator({
       console.log('✅ QR GENERATOR - Token généré manuellement:', token.substring(0, 20) + '...');
       setQrToken(token);
       onQRGenerated?.(token);
+      onTokenAvailable?.(token); // Nouveau callback
       
       Alert.alert(
         'QR Code généré !', 
@@ -238,10 +252,45 @@ export default function QRCodeGenerator({
             </Text>
           </View>
 
+          {/* Section Token Text */}
+          <View style={styles.tokenSection}>
+            <Text style={styles.tokenLabel}>Token QR (pour saisie manuelle) :</Text>
+            <View style={styles.tokenContainer}>
+              <Text style={styles.tokenText} numberOfLines={3} ellipsizeMode="middle">
+                {qrToken}
+              </Text>
+              <TouchableOpacity 
+                style={styles.copyButton}
+                onPress={() => {
+                  // Copier dans le presse-papier si disponible
+                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(qrToken);
+                    Alert.alert('Copié !', 'Token copié dans le presse-papier');
+                  } else {
+                    // Fallback : sélectionner le texte
+                    Alert.alert(
+                      'Token QR', 
+                      qrToken,
+                      [
+                        { text: 'Fermer' },
+                        { text: 'Tout sélectionner', onPress: () => {
+                          console.log('📋 TOKEN - Token à copier:', qrToken);
+                        }}
+                      ]
+                    );
+                  }
+                }}
+              >
+                <Ionicons name="copy" size={16} color="#007AFF" />
+                <Text style={styles.copyButtonText}>Copier</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <Text style={styles.instructions}>
             {status.isScanned 
               ? 'Votre séance a commencé ! 🎉'
-              : 'Montrez ce QR code à votre coach pour commencer la séance'
+              : 'Montrez ce QR code à votre coach OU donnez-lui le token ci-dessus'
             }
           </Text>
         </View>
@@ -433,5 +482,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  // Nouveaux styles pour le token
+  tokenSection: {
+    backgroundColor: '#f8f9fa',
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  tokenLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  tokenContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 10,
+  },
+  tokenText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#333',
+    fontFamily: 'monospace',
+    backgroundColor: 'transparent',
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginLeft: 4,
+    fontWeight: '500',
   },
 });

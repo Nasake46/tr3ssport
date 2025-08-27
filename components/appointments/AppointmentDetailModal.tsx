@@ -32,21 +32,33 @@ export default function AppointmentDetailModal({
 
   const getStatusColor = () => {
     switch (appointment.status) {
-      case 'confirmed': return '#28a745';
-      case 'pending': return '#ff9500';
-      case 'started': return '#007AFF';
-      case 'completed': return '#6c757d';
-      default: return '#999';
+      case 'confirmed':
+      case 'accepted':
+        return '#28a745';
+      case 'pending':
+        return '#ff9500';
+      case 'started':
+        return '#007AFF';
+      case 'completed':
+        return '#6c757d';
+      default:
+        return '#999';
     }
   };
 
   const getStatusText = () => {
     switch (appointment.status) {
-      case 'confirmed': return 'Confirmé';
-      case 'pending': return 'En attente';
-      case 'started': return 'En cours';
-      case 'completed': return 'Terminé';
-      default: return 'Statut inconnu';
+      case 'confirmed':
+      case 'accepted':
+        return 'Confirmé';
+      case 'pending':
+        return 'En attente';
+      case 'started':
+        return 'En cours';
+      case 'completed':
+        return 'Terminé';
+      default:
+        return 'Statut inconnu';
     }
   };
 
@@ -57,7 +69,7 @@ export default function AppointmentDetailModal({
     const appointmentEnd = new Date(appointmentTime.getTime() + (appointment.duration || 60) * 60 * 1000);
     
     return now >= thirtyMinsBefore && now <= appointmentEnd && 
-           ['confirmed', 'started'].includes(appointment.status || '');
+           ['confirmed', 'started', 'accepted'].includes(appointment.status || '');
   };
 
   const handleQRGenerated = (token: string) => {
