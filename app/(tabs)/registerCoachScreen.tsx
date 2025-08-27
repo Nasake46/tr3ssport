@@ -1,42 +1,94 @@
 import React, { useState } from 'react';
-import { TextInput, Text, TouchableOpacity, StyleSheet, View, Alert } from 'react-native';
+import { TextInput, Button, StyleSheet, View, Alert, Text, ScrollView } from 'react-native';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { auth, firestore } from '../../firebase';
+import { useRouter } from 'expo-router';
 
 export default function RegisterCoachScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [siretNumber, setSiretNumber] = useState('');
   const [diploma, setDiploma] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleRegister = () => {
-    console.log('Prénom:', firstName);
-    console.log('Nom:', lastName);
-    console.log('Email:', email);
-    console.log('Téléphone:', phone);
-    console.log('Adresse:', address);
-    console.log('Nom de la société:', companyName);
-    console.log('Numéro de SIRET:', siretNumber);
-    console.log('Diplôme:', diploma);
-    Alert.alert('Succès', 'Inscription réussie');
+  const handleRegister = async () => {
+    if (!email || !password) {
+      setErrorMessage('Veuillez entrer votre email et votre mot de passe.');
+      return;
+    }
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // 1) Créer / mettre à jour le document utilisateur avec rôle par défaut 'user'
+      await setDoc(doc(firestore, "users", user.uid), {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        address,
+        companyName,
+        siretNumber,
+        diploma,
+        role: "user",
+        createdAt: serverTimestamp(),
+        coachApplicationStatus: 'pending',
+      }, { merge: true });
+
+      // 2) Créer une demande d'approbation coach
+      await addDoc(collection(firestore, 'coachApplications'), {
+        userId: user.uid,
+        email,
+        firstName,
+        lastName,
+        phoneNumber,
+        address,
+        companyName,
+        siretNumber,
+        diploma,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+
+      console.log('Demande coach créée pour:', user.uid);
+      Alert.alert('Demande envoyée', "Votre demande d'inscription coach a été transmise. Un administrateur va l'examiner.", [
+        { 
+          text: 'OK', 
+          onPress: () => router.push('/(tabs)/LoginScreen')
+        }
+      ]);
+      
+      setEmail('');
+      setPassword('');
+      setPhoneNumber('');
+      setFirstName('');
+      setLastName('');
+      setAddress('');
+      setCompanyName('');
+      setSiretNumber('');
+      setDiploma('');
+      setErrorMessage(null);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'inscription:', error);
+      setErrorMessage(error.message);
+      Alert.alert('Erreur', `L'inscription a échoué : ${error.message}`);
+    }
   };
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Inscription Coach</Text>
-      <View style={styles.form}>
-        <Text style={styles.label}>Prénom</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Prénom"
-          value={firstName}
-          onChangeText={setFirstName}
-          autoCapitalize="words"
-        />
-
-        <Text style={styles.label}>Nom</Text>
+    <ScrollView>
+      <View style={styles.container}>
+        <Text style={styles.title}>Inscription Coach</Text>
+        {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+        
         <TextInput
           style={styles.input}
           placeholder="Nom"
@@ -44,109 +96,98 @@ export default function RegisterCoachScreen() {
           onChangeText={setLastName}
           autoCapitalize="words"
         />
-
-        <Text style={styles.label}>Email</Text>
+        
         <TextInput
           style={styles.input}
-          placeholder="example@email.com"
+          placeholder="Prénom"
+          value={firstName}
+          onChangeText={setFirstName}
+          autoCapitalize="words"
+        />
+        
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
         />
-
-        <Text style={styles.label}>Téléphone</Text>
+        
         <TextInput
           style={styles.input}
-          placeholder="(+33) 06 -- -- -- --"
-          value={phone}
-          onChangeText={setPhone}
+          placeholder="Numéro de téléphone"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
           keyboardType="phone-pad"
         />
-
-        <Text style={styles.label}>Adresse</Text>
+        
         <TextInput
           style={styles.input}
           placeholder="Adresse"
           value={address}
           onChangeText={setAddress}
         />
-
-        <Text style={styles.label}>Nom de la société</Text>
+        
         <TextInput
           style={styles.input}
           placeholder="Nom de la société"
           value={companyName}
           onChangeText={setCompanyName}
         />
-
-        <Text style={styles.label}>Numéro de SIRET</Text>
+        
         <TextInput
           style={styles.input}
           placeholder="Numéro de SIRET"
           value={siretNumber}
           onChangeText={setSiretNumber}
-          keyboardType="numeric"
+          keyboardType="number-pad"
         />
-
-        <Text style={styles.label}>Diplôme</Text>
+        
         <TextInput
           style={styles.input}
           placeholder="Diplôme"
           value={diploma}
           onChangeText={setDiploma}
         />
-
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Créer mon compte</Text>
-        </TouchableOpacity>
+        
+        <TextInput
+          style={styles.input}
+          placeholder="Mot de passe"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+        
+        <Button title="S'inscrire comme coach" onPress={handleRegister} />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  container: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingHorizontal: 24,
     justifyContent: 'center',
+    padding: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#3F3D56',
     textAlign: 'center',
-    marginBottom: 32,
-  },
-  form: {
-    backgroundColor: '#F5F3FE',
-    borderRadius: 20,
-    padding: 20,
-  },
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#3F3D56',
+    marginBottom: 20,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    fontSize: 16,
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    marginBottom: 12,
+    paddingHorizontal: 8,
+    borderRadius: 4,
   },
-  button: {
-    backgroundColor: '#5C4D91',
-    borderRadius: 25,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  error: {
+    color: 'red',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });

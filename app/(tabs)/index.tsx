@@ -9,6 +9,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -20,6 +22,8 @@ export default function HomeScreen() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setUserRole(userData.role);
+            setFirstName(userData.firstName);
+            setLastName(userData.lastName);
           } else {
             setUserRole("Rôle inconnu");
           }
@@ -62,7 +66,7 @@ export default function HomeScreen() {
         <Text>Chargement...</Text>
       ) : userRole ? (
         <>
-          <Text style={styles.welcomeText}>Bienvenue !</Text>
+          <Text style={styles.welcomeText}>Bienvenue {firstName} {lastName} !</Text>
           <Text style={styles.roleText}>Votre rôle : {userRole}</Text>
           
           
@@ -73,20 +77,24 @@ export default function HomeScreen() {
         <>
           <View style={styles.buttonContainer}>
             <Text style={styles.sectionTitle}>Espace Utilisateur</Text>
-            <Button title="Se connecter" onPress={() => router.push('/(tabs)/LoginScreen')} />
-            <Button title="S'inscrire" onPress={() => router.push('/(tabs)/registerScreen')} />
+            <Button title="Se connecter client" onPress={() => router.push('/auth/LoginScreen')} />
+            <Button title="S'inscrire coach" onPress={() => router.push('/auth/registerScreen')} />
+            <Button title="Se connecter coach" onPress={() => router.push('/auth/Login2')} />
+            <Button title="S'inscrire client" onPress={() => router.push('/auth/RegisterClient')} />
+            <Button title='Profil' onPress={() => router.push('/(tabs)/ProfileScreen')} />
+            <Button title='Coach Questions' onPress={() => router.push('/coachOnBoarding')} />
           </View>
           
-          <View style={styles.buttonContainer}>
+          {/* <View style={styles.buttonContainer}>
             <Text style={styles.sectionTitle}>Espace Coach</Text>
             <Button 
               title="Inscription Coach" 
               onPress={() => router.push('/(tabs)/registerCoachScreen')} 
             />
-          </View>
+          </View> */}
         </>
       )}
-      <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
+      {/* <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
       <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
       {/* <Button title="Login Coach" onPress={() => router.push('/(tabs)/loginCoachScreen')} /> */}
       <Button title="Register Coach" onPress={() => router.push('/(tabs)/registerCoachScreen')} />
