@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { auth, firestore } from '@/firebase';
+// Remplacer alias pour compat
+import { auth, firestore } from '../../firebase';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 
 export default function CoachHomeScreen() {
   const router = useRouter();
-  const [coachData, setCoachData] = useState<any>(null);
+  const [coachData, setCoachData] = useState<any>(null); // conservé pour future utilisation affichage
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRouterReady, setIsRouterReady] = useState(false);
@@ -35,7 +36,7 @@ export default function CoachHomeScreen() {
   };
 
   // Récupérer les données du coach
-  const fetchCoachData = async () => {
+  const fetchCoachData = useCallback(async () => {
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -66,11 +67,11 @@ export default function CoachHomeScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     fetchCoachData();
-  }, [router]);
+  }, [fetchCoachData]);
 
   const handleLogout = async () => {
     try {
@@ -104,6 +105,14 @@ export default function CoachHomeScreen() {
         
         {/* Menus principaux */}
         <View style={styles.menuContainer}>
+          {/* Nouveau bouton Séance active */}
+          <TouchableOpacity style={styles.menuButton} onPress={() => router.push('/coachActiveSession' as any)}>
+            <View style={[styles.iconCircle, { backgroundColor: '#EDEBFA' }] }>
+              <Ionicons name="flash" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Séance active</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.menuButton}>
             <View style={styles.iconCircle}>
               <Ionicons name="people" size={24} color="#7667ac" />
@@ -201,6 +210,20 @@ export default function CoachHomeScreen() {
               <Ionicons name="refresh" size={24} color="#fff" />
             </View>
             <Text style={styles.menuText}>Rafraîchir</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuButton} onPress={() => router.push('/pastSessions' as any)}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="time" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Séances passées</Text>
+          </TouchableOpacity>
+          {/* Example static link (replace ID) */}
+          <TouchableOpacity style={styles.menuButton} onPress={() => router.push('/sessionAttendance/example-id' as any)}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="list" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Assiduité</Text>
           </TouchableOpacity>
         </View>
 

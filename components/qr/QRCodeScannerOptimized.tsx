@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,18 +16,22 @@ import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraView, Camera } from 'expo-camera';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
+import { scanParticipantQRCode, manualStartSession, subscribeToAttendanceProgress } from '../../services/appointmentService';
 
 interface QRCodeScannerOptimizedProps {
   coachId: string;
   onSessionStarted?: (appointmentId: string) => void;
   onSessionEnded?: (appointmentId: string) => void;
+  onParticipantScanned?: (res: any) => void; // NEW: callback lorsqu'un participant est scanné
 }
 
 export default function QRCodeScannerOptimized({ 
   coachId, 
   onSessionStarted, 
-  onSessionEnded 
+  onSessionEnded,
+  onParticipantScanned
 }: QRCodeScannerOptimizedProps) {
+  // Hooks & state declarations FIRST
   const [manualToken, setManualToken] = useState('');
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -36,21 +40,78 @@ export default function QRCodeScannerOptimized({
   const [showEndConfirmModal, setShowEndConfirmModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [modalMessage, setModalMessage] = useState({ title: '', message: '', type: 'info' as 'info' | 'success' | 'error' });
+  const [scanProgress, setScanProgress] = useState<{ appointmentId: string; presentCount: number; totalClients: number; started: boolean } | null>(null);
+  const [manualStarting, setManualStarting] = useState(false);
   const isWeb = Platform.OS === 'web';
-  // Ajout: orientation caméra avec fallback (web/desktop)
   const [cameraFacing, setCameraFacing] = useState<'back' | 'front'>('back');
   
-  // Utilisation des hooks personnalisés
+  // Custom hooks AFTER state
   const {
     activeSession,
     loading,
     loadActiveSession,
     startSession,
-    endSession,
-    endSessionWithConfirmation
+    endSession
   } = useActiveSession(coachId);
-  
+
   const { sessionTime, totalSeconds } = useSessionTimer(activeSession);
+
+  const getCameraPermissions = useCallback(async () => {
+    try {
+      console.log('📷 CAMÉRA - Demande de permissions...');
+      let status: string | undefined;
+      if (isWeb) {
+        const result = await Camera.requestCameraPermissionsAsync();
+        status = result.status;
+      } else {
+        const result = await BarCodeScanner.requestPermissionsAsync();
+        status = result.status;
+      }
+      console.log('📷 CAMÉRA - Statut permission:', status);
+      setHasPermission(status === 'granted');
+      if (status === 'granted') {
+        console.log('✅ CAMÉRA - Permissions accordées');
+        setCameraError(null);
+      } else {
+        console.log('❌ CAMÉRA - Permissions refusées');
+        setCameraError('Permissions caméra refusées');
+      }
+    } catch (error) {
+      console.error('❌ CAMÉRA - Erreur permissions:', error);
+      setHasPermission(false);
+      setCameraError(`Erreur permissions: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    }
+  }, [isWeb]);
+
+  const checkCameraAvailability = useCallback(async () => {
+    try {
+      console.log('📷 CAMÉRA - Vérification basique...');
+      if (isWeb && typeof window !== 'undefined') {
+        const host = window.location.hostname;
+        const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        if (!window.isSecureContext && !isLocal) {
+          const msg = 'Le navigateur bloque la caméra car le site n\'est pas en HTTPS. Ouvrez le site en HTTPS (ou en localhost).';
+            console.warn('⚠️ CAMÉRA - Contexte non sécurisé:', { host, isSecureContext: (window as any).isSecureContext });
+          setCameraError(msg);
+          return false;
+        }
+      }
+      if (typeof window !== 'undefined' && navigator.mediaDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(device => device.kind === 'videoinput');
+        console.log('📷 CAMÉRA - Caméras détectées:', cameras.length);
+        if (cameras.length === 0) {
+          setCameraError('Aucune caméra détectée');
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error('❌ CAMÉRA - Erreur vérification:', error);
+      setCameraError(`Erreur caméra: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      return false;
+    }
+  }, [isWeb]);
 
   // Debug pour surveiller l'état du modal
   useEffect(() => {
@@ -66,82 +127,14 @@ export default function QRCodeScannerOptimized({
 
   // Charger la session active au montage du composant
   useEffect(() => {
-    loadActiveSession();
-    
-    // Vérifier les permissions immédiatement
-    const initCamera = async () => {
+    // encapsuler fonctions dans effet pour éviter warnings dépendances
+    const init = async () => {
+      await loadActiveSession();
       await getCameraPermissions();
       await checkCameraAvailability();
     };
-    
-    initCamera();
-  }, [loadActiveSession]);
-
-  const getCameraPermissions = async () => {
-    try {
-      console.log('📷 CAMÉRA - Demande de permissions...');
-      let status: string | undefined;
-
-      if (isWeb) {
-        const result = await Camera.requestCameraPermissionsAsync();
-        status = result.status;
-      } else {
-        const result = await BarCodeScanner.requestPermissionsAsync();
-        status = result.status;
-      }
-
-      console.log('📷 CAMÉRA - Statut permission:', status);
-      setHasPermission(status === 'granted');
-
-      if (status === 'granted') {
-        console.log('✅ CAMÉRA - Permissions accordées');
-        setCameraError(null);
-      } else {
-        console.log('❌ CAMÉRA - Permissions refusées');
-        setCameraError('Permissions caméra refusées');
-      }
-    } catch (error) {
-      console.error('❌ CAMÉRA - Erreur permissions:', error);
-      setHasPermission(false);
-      setCameraError(`Erreur permissions: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
-    }
-  };
-
-  const checkCameraAvailability = async () => {
-    try {
-      console.log('📷 CAMÉRA - Vérification basique...');
-      
-      // Vérifier le contexte sécurisé sur le web (HTTPS requis hors localhost)
-      if (isWeb && typeof window !== 'undefined') {
-        const host = window.location.hostname;
-        const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-        if (!window.isSecureContext && !isLocal) {
-          const msg = 'Le navigateur bloque la caméra car le site n\'est pas en HTTPS. Ouvrez le site en HTTPS (ou en localhost).';
-          console.warn('⚠️ CAMÉRA - Contexte non sécurisé:', { host, isSecureContext: window.isSecureContext });
-          setCameraError(msg);
-          return false;
-        }
-      }
-      
-      // Test simple pour voir si on peut utiliser la caméra
-      if (typeof window !== 'undefined' && navigator.mediaDevices) {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const cameras = devices.filter(device => device.kind === 'videoinput');
-        console.log('📷 CAMÉRA - Caméras détectées:', cameras.length);
-        
-        if (cameras.length === 0) {
-          setCameraError('Aucune caméra détectée');
-          return false;
-        }
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('❌ CAMÉRA - Erreur vérification:', error);
-      setCameraError(`Erreur caméra: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
-      return false;
-    }
-  };
+    init();
+  }, [loadActiveSession, getCameraPermissions, checkCameraAvailability]);
 
   const handleCameraScan = async () => {
     console.log('📷 CAMÉRA - Début handleCameraScan');
@@ -175,14 +168,54 @@ export default function QRCodeScannerOptimized({
     setScanning(true);
   };
 
+  const isParticipantToken = (token: string): boolean => {
+    if (!token || token.length > 500) return false;
+    try {
+      let json = '';
+      if (typeof atob === 'function') json = atob(token);
+      else if (typeof Buffer !== 'undefined') json = Buffer.from(token, 'base64').toString('utf8');
+      else return false;
+      const obj = JSON.parse(json);
+      return obj && typeof obj === 'object' && obj.a && obj.p;
+    } catch { return false; }
+  };
+
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
     if (scanned || loading) return;
     
     console.log('📷 CAMÉRA - QR Code scanné:', { type, data: data.substring(0, 50) + '...' });
     
+    // Participant token path
+    if (isParticipantToken(data)) {
+      setScanned(true);
+      setScanning(false);
+      const res = await scanParticipantQRCode(data, coachId);
+      if (res.success) {
+        // NOUVEAU: transmettre le résultat détaillé au parent
+        try { onParticipantScanned?.(res); } catch (e) { console.warn('onParticipantScanned callback error', e); }
+        showMessage('Présence', res.message + (res.presentCount !== undefined && res.totalClients !== undefined ? ` (${res.presentCount}/${res.totalClients})` : ''), 'success');
+        if (res.presentCount !== undefined && res.totalClients !== undefined && res.appointmentId) {
+          setScanProgress({ appointmentId: res.appointmentId, presentCount: res.presentCount, totalClients: res.totalClients, started: !!res.autoStarted || (activeSession?.appointmentId === res.appointmentId) });
+        }
+        if (res.autoStarted && res.appointmentId) {
+          onSessionStarted?.(res.appointmentId);
+        }
+        // Autoriser un nouveau scan immédiatement pour enchaîner
+        setTimeout(() => setScanned(false), 500);
+      } else {
+        if (res.message && res.message.toLowerCase().includes('expiré')) {
+          showMessage('QR expiré', 'Le QR participant a expiré (>15 min). Demandez au participant de régénérer son QR dans son application.', 'error');
+        } else {
+          showMessage('Erreur scan', res.message, 'error');
+        }
+        // Réarmer plus vite pour retenter immédiatement
+        setTimeout(() => setScanned(false), 400);
+      }
+      return;
+    }
+    // Legacy appointment token path
     setScanned(true);
     setScanning(false);
-    
     const result = await startSession(data);
     
     if (result.success) {
@@ -219,6 +252,23 @@ export default function QRCodeScannerOptimized({
     }
   };
 
+  const handleManualStart = async () => {
+    if (!scanProgress || scanProgress.started) return;
+    setManualStarting(true);
+    try {
+      const res = await manualStartSession(scanProgress.appointmentId, coachId);
+      if (res.success) {
+        showMessage('Séance démarrée', res.message, 'success');
+        setScanProgress(prev => prev ? { ...prev, started: true } : prev);
+        onSessionStarted?.(scanProgress.appointmentId);
+      } else {
+        showMessage('Erreur', res.message, 'error');
+      }
+    } catch {
+      showMessage('Erreur', 'Démarrage manuel impossible', 'error');
+    } finally { setManualStarting(false); }
+  };
+
   const handleEndSession = () => {
     console.log('🎯 QR OPTIMIZED - DÉBUT handleEndSession');
     console.log('🎯 QR OPTIMIZED - activeSession:', !!activeSession);
@@ -232,9 +282,7 @@ export default function QRCodeScannerOptimized({
     }
     
     const sessionId = activeSession.appointmentId;
-    const clientName = activeSession.clientName;
     console.log('🎯 QR OPTIMIZED - Session ID:', sessionId);
-    console.log('🎯 QR OPTIMIZED - Client:', clientName);
     
     console.log('🎯 QR OPTIMIZED - Affichage dialogue confirmation...');
     
@@ -265,7 +313,6 @@ export default function QRCodeScannerOptimized({
     if (!activeSession) return;
     
     const sessionId = activeSession.appointmentId;
-    const clientName = activeSession.clientName;
     
     setShowEndConfirmModal(false);
     
@@ -364,6 +411,18 @@ export default function QRCodeScannerOptimized({
   // Interface de scan QR
   return (
     <View style={styles.container}>
+      {/* Progress multi-participant (en haut) */}
+      {scanProgress && (
+        <View style={styles.progressBarContainer}>
+          <Text style={styles.progressText}>Présents: {scanProgress.presentCount}/{scanProgress.totalClients} {scanProgress.started ? '(démarrée)' : ''}</Text>
+          {!scanProgress.started && (
+            <TouchableOpacity style={styles.manualStartBtn} onPress={handleManualStart} disabled={manualStarting}>
+              <Text style={styles.manualStartText}>{manualStarting ? '...' : 'Démarrer maintenant'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <View style={styles.header}>
         <Ionicons name="scan" size={32} color="#007AFF" />
         <Text style={styles.title}>Scanner QR Code</Text>
@@ -618,6 +677,18 @@ export default function QRCodeScannerOptimized({
           </View>
         </View>
       </Modal>
+
+      {/* Progress multi-participant */}
+      {scanProgress && (
+        <View style={styles.progressBarContainer}>
+          <Text style={styles.progressText}>Présents: {scanProgress.presentCount}/{scanProgress.totalClients} {scanProgress.started ? '(démarrée)' : ''}</Text>
+          {!scanProgress.started && (
+            <TouchableOpacity style={styles.manualStartBtn} onPress={handleManualStart} disabled={manualStarting}>
+              <Text style={styles.manualStartText}>{manualStarting ? '...' : 'Démarrer maintenant'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -947,4 +1018,9 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: 'bold',
   },
+  wrapper: { flex:1 },
+  progressBarContainer: { backgroundColor:'#fff', padding:10, borderBottomColor:'#eee', borderBottomWidth:1, marginBottom:8, borderRadius:8 },
+  progressText: { fontSize:14, fontWeight:'600', color:'#333' },
+  manualStartBtn: { marginTop:6, alignSelf:'flex-start', backgroundColor:'#7667ac', paddingHorizontal:12, paddingVertical:6, borderRadius:6 },
+  manualStartText: { color:'#fff', fontSize:12, fontWeight:'600' },
 });
