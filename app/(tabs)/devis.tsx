@@ -1,10 +1,19 @@
-// app/quote.tsx
-import { View, Text, TextInput, Button, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { Picker } from '@react-native-picker/picker';
+
+const COLORS = {
+  bg: '#FFFFFF',
+  text: '#0F473C',
+  sub: '#3D6B60',
+  primary: '#0E6B5A',
+  chip: '#F4AF00',
+  card: '#F2F4F5',
+  line: '#E5E7EB',
+};
 
 const MUTUELLE_NAMES = [
   'Harmonie Mutuelle',
@@ -36,7 +45,7 @@ const MUTUELLES: Record<MutuelleName, number> = {
   'Mutuelle des Sportifs': 250,
   'Identités Mutuelle': 35,
   'Mutuelle du Rempart': 50,
-  'MMA': 0, // spécifique à la remise
+  'MMA': 0,
   'Autre': 50,
 };
 
@@ -71,17 +80,15 @@ export default function QuoteScreen() {
     const forfait = MUTUELLES[mutuelle] ?? 50;
 
     if (!firstName || !lastName || !email) {
-      Alert.alert('Erreur', 'Veuillez remplir vos informations personnelles.');
+      alert('Veuillez remplir vos informations personnelles.');
       return;
     }
-
     if (isNaN(total) || total <= 0) {
-      Alert.alert('Erreur', 'Veuillez entrer un montant total valide.');
+      alert('Veuillez entrer un montant total valide.');
       return;
     }
-
     if (!certificat) {
-      Alert.alert('Erreur', 'Veuillez joindre un certificat médical.');
+      alert('Veuillez joindre un certificat médical.');
       return;
     }
 
@@ -116,90 +123,126 @@ export default function QuoteScreen() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>Devis Sport & Santé</Text>
+    <ScrollView style={{ flex: 1, backgroundColor: COLORS.bg, padding: 20 }}>
+      <Text style={s.title}>Devis Sport & Santé</Text>
 
-      <Text style={{ marginBottom: 5 }}>Prénom :</Text>
+      <Text style={s.label}>Prénom :</Text>
       <TextInput
         value={firstName}
         onChangeText={setFirstName}
         placeholder="Prénom"
-        style={{ borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 10 }}
+        style={s.input}
       />
 
-      <Text style={{ marginBottom: 5 }}>Nom :</Text>
+      <Text style={s.label}>Nom :</Text>
       <TextInput
         value={lastName}
         onChangeText={setLastName}
         placeholder="Nom"
-        style={{ borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 10 }}
+        style={s.input}
       />
 
-      <Text style={{ marginBottom: 5 }}>Email :</Text>
+      <Text style={s.label}>Email :</Text>
       <TextInput
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
         placeholder="adresse@mail.com"
-        style={{ borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 20 }}
+        style={s.input}
       />
 
-      <Text style={{ marginBottom: 5 }}>Mutuelle :</Text>
-      <Picker selectedValue={mutuelle} onValueChange={setMutuelle} style={{ marginBottom: 20 }}>
-        {MUTUELLE_NAMES.map((name) => (
-          <Picker.Item key={name} label={name} value={name} />
-        ))}
-      </Picker>
+      <Text style={s.label}>Mutuelle :</Text>
+      <View style={s.pickerBox}>
+        <Picker selectedValue={mutuelle} onValueChange={setMutuelle} style={s.picker}>
+          {MUTUELLE_NAMES.map((name) => (
+            <Picker.Item key={name} label={name} value={name} />
+          ))}
+        </Picker>
+      </View>
 
-      <Text>Montant total (€) :</Text>
+      <Text style={s.label}>Montant total (€) :</Text>
       <TextInput
         keyboardType="decimal-pad"
         value={totalAmount}
         onChangeText={setTotalAmount}
         placeholder="Ex : 60.00"
-        style={{
-          borderWidth: 1,
-          borderColor: '#ccc',
-          padding: 10,
-          marginBottom: 20,
-        }}
+        style={s.input}
       />
 
-      <TouchableOpacity
-        onPress={pickCertificat}
-        style={{
-          backgroundColor: '#eee',
-          padding: 15,
-          borderRadius: 10,
-          marginBottom: 10,
-          alignItems: 'center',
-        }}
-      >
-        <Text>{certificat ? `📄 ${certificat.name}` : 'Joindre un certificat médical'}</Text>
+      <TouchableOpacity onPress={pickCertificat} style={s.uploadBtn}>
+        <Text style={s.uploadBtnTxt}>
+          {certificat ? `📄 ${certificat.name}` : 'Joindre un certificat médical'}
+        </Text>
       </TouchableOpacity>
 
-      <Button title="Générer le devis" onPress={generateQuote} />
+      <TouchableOpacity style={s.btnPrimary} onPress={generateQuote}>
+        <Text style={s.btnPrimaryTxt}>Générer le devis</Text>
+      </TouchableOpacity>
 
       {quote && (
-        <View style={{ marginTop: 30, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 10 }}>
-          <Text style={{ fontSize: 18, marginBottom: 10, fontWeight: 'bold' }}>Détail du devis</Text>
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Détail du devis</Text>
           <Text>Nom : {firstName} {lastName}</Text>
           <Text>Email : {email}</Text>
           <Text>Montant total : {quote.total.toFixed(2)} €</Text>
           <Text>Remboursement ({mutuelle}) : {quote.reimbursed.toFixed(2)} €</Text>
-          <Text style={{ marginTop: 10, fontWeight: 'bold' }}>
+          <Text style={{ marginTop: 8, fontWeight: 'bold' }}>
             Reste à charge : {quote.remaining.toFixed(2)} €
           </Text>
           {MUTUELLES_REMARKS[mutuelle] && (
-            <Text style={{ marginTop: 15, fontStyle: 'italic' }}>
+            <Text style={{ marginTop: 12, fontStyle: 'italic' }}>
               Note : {MUTUELLES_REMARKS[mutuelle]}
             </Text>
           )}
-          <View style={{ marginTop: 20 }}>
-            <Button title="Exporter en PDF" onPress={handleExportPDF} />
-          </View>
+          <TouchableOpacity style={[s.btnPrimary, { marginTop: 16 }]} onPress={handleExportPDF}>
+            <Text style={s.btnPrimaryTxt}>Exporter en PDF</Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
   );
 }
+
+const s = StyleSheet.create({
+  title: { fontSize: 24, fontWeight: '700', color: COLORS.text, marginBottom: 20 },
+  label: { marginBottom: 6, color: COLORS.sub, fontWeight: '600' },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+    backgroundColor: '#fff',
+  },
+  pickerBox: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    marginBottom: 14,
+    backgroundColor: '#fff',
+  },
+  picker: { width: '100%', height: 50 },
+  uploadBtn: {
+    backgroundColor: COLORS.card,
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  uploadBtnTxt: { color: COLORS.text, fontWeight: '600' },
+  btnPrimary: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 28,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  btnPrimaryTxt: { color: '#fff', fontWeight: '700' },
+  card: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+  },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 10 },
+});

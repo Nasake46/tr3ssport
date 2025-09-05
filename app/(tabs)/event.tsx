@@ -1,49 +1,123 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { firestore } from '../../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, Timestamp } from 'firebase/firestore';
+
+// Define the Participant interface
+interface Participant {
+  email?: string;
+  id: string;
+  invitedAt: Timestamp;
+  name?: string;
+  status: 'invited' | 'accepted' | 'responded';
+  type: 'coach' | 'client';
+  respondedAt?: Timestamp;
+}
+
+// Define the full EventData interface
+interface EventData {
+  id: string;
+  activity: string;
+  createdAt: Timestamp;
+  createdBy: string;
+  date: Timestamp;
+  description: string;
+  endTime: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  maxParticipants: number;
+  participants: Participant[];
+  startTime: string;
+  status: 'pending' | 'active'; // or other possible statuses
+  title: string;
+  type: 'group_session'; // or other possible types
+  updatedAt: Timestamp;
+  distance: number;
+}
 
 export default function EventScreen() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventData[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Console log to confirm component mount
+  console.log('EventScreen component mounted.');
+
   useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setError('Permission de localisation refusée.');
+    console.log('useEffect triggered.');
+    const fetchData = async () => {
+      console.log('fetchData function started.');
+      let userLoc = null;
+
+      // 1. Request location permission and get current position
+      try {
+        console.log('Requesting location permission...');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('Location permission denied.');
+          setError('Permission de localisation refusée. Certains événements ne peuvent pas être affichés.');
+          setLoading(false);
+          return;
+        }
+        console.log('Location permission granted.');
+        
+        console.log('Getting current position...');
+        const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        userLoc = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        };
+        setUserLocation(userLoc);
+        console.log('User location obtained:', userLoc);
+      } catch (locationError) {
+        console.error("Erreur de localisation:", locationError);
+        setError("Impossible d'obtenir votre position. Veuillez vérifier les services de localisation.");
         setLoading(false);
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
-      const userLoc = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-      setUserLocation(userLoc);
+      // 2. Fetch events from Firestore
+      try {
+        console.log('Fetching events from Firestore...');
+        const snapshot = await getDocs(collection(firestore, 'groupAppointments'));
+        console.log('Events snapshot received. Number of documents:', snapshot.docs.length);
+        
+        const fetchedEvents = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() as Omit<EventData, 'id' | 'distance'>
+        }));
 
-      const snapshot = await getDocs(collection(firestore, 'groupAppointments'));
-      const fetchedEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const withDistance = fetchedEvents
+          .filter(e => e.location?.latitude && e.location?.longitude)
+          .map(e => ({
+            ...e,
+            distance: userLoc ? getDistance(userLoc, { latitude: e.location.latitude, longitude: e.location.longitude }) : 0
+          }));
+        
+        if (userLoc) {
+            withDistance.sort((a, b) => a.distance - b.distance);
+        }
 
-      const filtered = fetchedEvents.filter(e => e.location?.latitude && e.location?.longitude);
+        setEvents(withDistance);
+        console.log('Events state updated. Total events:', withDistance.length);
+      } catch (firestoreError) {
+        console.error("Erreur Firestore:", firestoreError);
+        setError("Erreur lors de la récupération des événements. Veuillez réessayer.");
+      } finally {
+        console.log('Finished all async operations. Setting loading to false.');
+        setLoading(false);
+      }
+    };
 
-      const withDistance = filtered.map(e => ({
-        ...e,
-        distance: getDistance(userLoc, { latitude: e.location.latitude, longitude: e.location.longitude })
-      }));
-
-      withDistance.sort((a, b) => a.distance - b.distance);
-      setEvents(withDistance);
-      setLoading(false);
-    })();
+    fetchData();
   }, []);
 
-  const getDistance = (loc1: any, loc2: any) => {
+  const getDistance = (loc1: { latitude: number, longitude: number }, loc2: { latitude: number, longitude: number }) => {
     const toRad = (value: number) => (value * Math.PI) / 180;
     const R = 6371; // km
     const dLat = toRad(loc2.latitude - loc1.latitude);
@@ -57,7 +131,7 @@ export default function EventScreen() {
   };
 
   if (loading) return <ActivityIndicator size="large" style={{ marginTop: 50 }} />;
-  if (error) return <Text style={{ color: 'red', padding: 20 }}>{error}</Text>;
+  if (error) return <Text style={{ color: 'red', padding: 20, textAlign: 'center' }}>{error}</Text>;
 
   return (
     <View style={styles.container}>
@@ -80,8 +154,8 @@ export default function EventScreen() {
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
-              scrollEnabled={false}
-              zoomEnabled={false}
+              scrollEnabled={true}
+              zoomEnabled={true}
             >
               <Marker
                 coordinate={{
@@ -93,7 +167,7 @@ export default function EventScreen() {
             </MapView>
           </View>
         )}
-        ListEmptyComponent={<Text>Aucun événement trouvé.</Text>}
+        ListEmptyComponent={<Text style={{ textAlign: 'center' }}>Aucun événement trouvé.</Text>}
       />
     </View>
   );

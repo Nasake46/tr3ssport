@@ -1,153 +1,182 @@
 import React, { useState, useEffect } from 'react';
-import { Button, StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import {
+  TextInput,
+  View,
+  Alert,
+  ActivityIndicator,
+  TouchableOpacity,
+  Text,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { styles } from '../styles/auth/LoginScreen.styles';
+
+// Firebase
 import { auth, firestore } from '@/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
-export default function HomeScreen() {
+// Google sign-in (Expo)
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_IDS = {
+  expo: 'TON_CLIENT_ID_EXPO_APPS',
+  ios: 'TON_CLIENT_ID_IOS',
+  android: 'TON_CLIENT_ID_ANDROID',
+  web: 'TON_CLIENT_ID_WEB',
+};
+
+export default function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
 
+  // Google auth request
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: GOOGLE_CLIENT_IDS.expo,
+    iosClientId: GOOGLE_CLIENT_IDS.ios,
+    androidClientId: GOOGLE_CLIENT_IDS.android,
+    webClientId: GOOGLE_CLIENT_IDS.web,
+    responseType: 'id_token',
+  });
+
+  // Handle Google response
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
-      if (user) {
-        // Utilisateur connecté, récupérer son rôle
-        try {
-          const userDoc = await getDoc(doc(firestore, "users", user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUserRole(userData.role);
-            setFirstName(userData.firstName);
-            setLastName(userData.lastName);
-          } else {
-            setUserRole("Rôle inconnu");
-          }
-        } catch (error) {
-          console.error("Erreur lors de la récupération du rôle:", error);
-          setUserRole("Erreur");
-        }
-      } else {
-        // Utilisateur déconnecté
-        setUserRole(null);
+    const run = async () => {
+      if (response?.type !== 'success') return;
+      const idToken = response.authentication?.idToken;
+      if (!idToken) {
+        Alert.alert('Erreur', 'Token Google manquant.');
+        return;
       }
-      setLoading(false);
-    });
+      try {
+        setLoading(true);
+        const credential = GoogleAuthProvider.credential(idToken);
+        const userCred = await signInWithCredential(auth, credential);
+        const snap = await getDoc(doc(firestore, 'users', userCred.user.uid));
+        if (!snap.exists()) {
+          Alert.alert('Erreur', 'Profil utilisateur incomplet');
+          return;
+        }
+        const data = snap.data() as { role?: string };
+        Alert.alert('Succès', 'Connexion réussie avec Google !');
+        if (data.role === 'coach') router.replace('/(tabs)/homeCoach');
+        else router.replace('/(tabs)/HomeScreen');
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Erreur', 'Échec de connexion Google.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [response]);
 
-    // Nettoyer l'abonnement à la déconnexion
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUserRole(null);
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
     }
-  };
-
-  // Fonction pour rediriger vers la page d'accueil appropriée en fonction du rôle
-  const navigateToHome = () => {
-    if (userRole === 'coach') {
-      router.push('/(tabs)/homeCoach');
-    } else {
-      router.push('/(tabs)/HomeScreen');
+    try {
+      setLoading(true);
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDoc(doc(firestore, 'users', userCred.user.uid));
+      if (!snap.exists()) {
+        Alert.alert('Erreur', 'Profil utilisateur incomplet');
+        return;
+      }
+      const data = snap.data() as { role?: string };
+      Alert.alert('Succès', 'Connexion réussie !');
+      if (data.role === 'coach') router.replace('/(tabs)/homeCoach');
+      else router.replace('/(tabs)/HomeScreen');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Erreur', 'Impossible de se connecter. Vérifiez vos identifiants.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      {loading ? (
-        <Text>Chargement...</Text>
-      ) : userRole ? (
-        <>
-          <Text style={styles.welcomeText}>Bienvenue {firstName} {lastName} !</Text>
-          <Text style={styles.roleText}>Votre rôle : {userRole}</Text>
-          
-          
-          <Button title="Accéder à mon espace" onPress={navigateToHome} />
-          <Button title="Se déconnecter" onPress={handleLogout} />
-        </>
-      ) : (
-        <>
-          <View style={styles.buttonContainer}>
-            <Text style={styles.sectionTitle}>Espace Utilisateur</Text>
-            <Button title="Se connecter client" onPress={() => router.push('/auth/LoginScreen')} />
-            <Button title="S'inscrire coach" onPress={() => router.push('/auth/registerScreen')} />
-            <Button title="Se connecter coach" onPress={() => router.push('/auth/Login2')} />
-            <Button title="S'inscrire client" onPress={() => router.push('/auth/RegisterClient')} />
-            <Button title='Profil' onPress={() => router.push('/(tabs)/ProfileScreen')} />
-            <Button title='Coach Questions' onPress={() => router.push('/coachOnBoarding')} />
-          </View>
-          
-          {/* <View style={styles.buttonContainer}>
-            <Text style={styles.sectionTitle}>Espace Coach</Text>
-            <Button 
-              title="Inscription Coach" 
-              onPress={() => router.push('/(tabs)/registerCoachScreen')} 
-            />
-          </View> */}
-        </>
-      )}
-      {/* <Button title="Login" onPress={() => router.push('/(tabs)/LoginScreen')} />
-      <Button title="Register" onPress={() => router.push('/(tabs)/registerScreen')} />
-      {/* <Button title="Login Coach" onPress={() => router.push('/(tabs)/loginCoachScreen')} /> */}
-      <Button title="Register Coach" onPress={() => router.push('/(tabs)/registerCoachScreen')} />
-    </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
+    >
+      <Image source={require('@/assets/images/logoT.png')} style={styles.logo} />
+
+      <View style={styles.formContainer}>
+        <Text style={styles.title}>Connexion</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#555"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Mot de passe"
+          placeholderTextColor="#555"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <Text style={styles.forgot}>Mot de passe oublié ?</Text>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#F4AF00" />
+        ) : (
+          <>
+            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+              <Text style={styles.loginButtonText}>Se connecter</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.outlineButton} onPress={() => router.push('/auth/RegisterClient')}>
+              <Text style={styles.outlineButtonText}>Créer ton compte</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      <View style={styles.bottomSection}>
+        <View style={styles.separator}>
+          <View style={styles.line} />
+          <Text style={styles.or}>Continuer avec</Text>
+          <View style={styles.line} />
+        </View>
+
+        <View style={styles.socials}>
+          <TouchableOpacity
+            onPress={() => promptAsync()}
+            disabled={!request || loading}
+            style={{ opacity: !request || loading ? 0.5 : 1 }}
+          >
+            <Text style={styles.social}>G</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.social}>f</Text>
+          <Text style={styles.social}></Text>
+        </View>
+
+        <TouchableOpacity onPress={() => router.push('/auth/Login2')}>
+          <Text style={styles.coachLink}>Vous êtes coach ?</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerTitle}>Contact</Text>
+        <Text style={styles.footerText}>(01) 45 35 37 83</Text>
+        <Text style={styles.footerText}>contact@company.com</Text>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 24,
-    padding: 16,
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  roleText: {
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  clientMenu: {
-    width: '100%',
-    gap: 12,
-    marginBottom: 20,
-  },
-  menuButton: {
-    backgroundColor: '#7667ac',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  groupMenuButton: {
-    backgroundColor: '#4CAF50', // Couleur différente pour les rendez-vous de groupe
-  },
-  menuButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});

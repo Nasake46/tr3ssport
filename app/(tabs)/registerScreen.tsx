@@ -1,155 +1,96 @@
 import React, { useState } from 'react';
-import { TextInput, Text, TouchableOpacity, StyleSheet, View } from 'react-native';
+import {
+  Text,
+  TextInput,
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import { styles } from '../styles/auth/registerScreen.styles';
 
-export default function RegisterScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const router = useRouter();
+export default function RegisterCoachScreen() {
+  const [form, setForm] = useState({
+    lastName: '',
+    firstName: '',
+    email: '',
+    phone: '',
+    address: '',
+    company: '',
+    siret: '',
+    diploma: null as string | null,
+  });
 
-  const handleRegister = async () => {
-    if (!email || !password) {
-      setErrorMessage('Veuillez entrer votre email et votre mot de passe.');
-      return;
-    }
+  const handleChange = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
 
-    try {
-      // 1. Créer l'utilisateur dans Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // 2. Ajouter les informations supplémentaires dans Firestore avec le rôle "user"
-      await setDoc(doc(firestore, "users", user.uid), {
-        firstName,
-        lastName,
-        email,
-        phoneNumber,
-        role: "user", // Définir le rôle comme "user"
-        createdAt: new Date()
-      });
-      
-      console.log('Utilisateur enregistré:', user);
-      Alert.alert('Succès', 'Votre compte a été créé avec succès !');
-      router.push('/(tabs)/LoginScreen');
-      
-      // Réinitialiser les champs après l'inscription
-      setEmail('');
-      setPassword('');
-      setPhoneNumber('');
-      setFirstName('');
-      setLastName('');
-      setErrorMessage(null);
-    } catch (error: any) {
-      console.error('Erreur lors de l\'inscription:', error);
-      setErrorMessage(error.message);
-      Alert.alert('Erreur', `L'inscription a échoué : ${error.message}`);
+  const handlePickDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+    });
+
+    if (result.assets && result.assets.length > 0) {
+      setForm((prev) => ({
+        ...prev,
+        diploma: result.assets[0].name,
+      }));
     }
   };
 
+  const handleSubmit = () => {
+    Alert.alert('Succès', 'Compte coach prêt à être créé.');
+  };
+
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Créer un compte</Text>
-      <View style={styles.form}>
-        <Text style={styles.label}>Prénom</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Prénom"
-          value={firstName}
-          onChangeText={setFirstName}
-          autoCapitalize="words"
-        />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.title}>Créer un compte</Text>
 
-        <Text style={styles.label}>Nom</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Nom"
-          value={lastName}
-          onChangeText={setLastName}
-          autoCapitalize="words"
-        />
+        <View style={styles.form}>
+          {[
+            { label: 'Nom', field: 'lastName' },
+            { label: 'Prénom', field: 'firstName' },
+            { label: 'Email', field: 'email' },
+            { label: 'Portable', field: 'phone' },
+            { label: 'Adresse', field: 'address' },
+            { label: 'Nom de la société', field: 'company' },
+            { label: 'N° de Siret', field: 'siret' },
+          ].map(({ label, field }) => (
+            <View key={field} style={styles.inputGroup}>
+              <Text style={styles.label}>{label}</Text>
+              <TextInput
+                style={styles.input}
+                value={form[field as keyof typeof form] as string}
+                onChangeText={(text) => handleChange(field, text)}
+                placeholder={label}
+                placeholderTextColor="#999"
+              />
+            </View>
+          ))}
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="example@email.com"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+          {/* Upload diplôme */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Diplôme</Text>
+            <TouchableOpacity style={styles.input} onPress={handlePickDocument}>
+              <Text style={{ color: form.diploma ? '#000' : '#999' }}>
+                {form.diploma || 'Importer un fichier PDF'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        <Text style={styles.label}>Numéro de téléphone</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="(+33) 06 -- -- -- --"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-          keyboardType="phone-pad"
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.label}>Mot de passe</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Mot de passe"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Créer mon compte</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            <Text style={styles.submitText}>Créer mon compte</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#fff',
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#3F3D56',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  form: {
-    backgroundColor: '#F5F3FE',
-    borderRadius: 20,
-    padding: 20,
-  },
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#3F3D56',
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: '#5C4D91',
-    borderRadius: 25,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-});

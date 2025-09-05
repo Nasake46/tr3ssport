@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   TextInput,
   StyleSheet,
@@ -20,17 +20,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [redirectPath, setRedirectPath] = useState<string | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    if (redirectPath) {
-      const timeout = setTimeout(() => {
-        router.replace('/(tabs)');
-      }, 500);
-      return () => clearTimeout(timeout);
-    }
-  }, [redirectPath]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -42,10 +32,17 @@ export default function LoginScreen() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const userDoc = await getDoc(doc(firestore, 'users', userCredential.user.uid));
+
       if (userDoc.exists()) {
         const userData = userDoc.data();
         Alert.alert('Succès', 'Connexion réussie !');
-        setRedirectPath(userData.role === 'coach' ? '/(tabs)/homeCoach' : '/(tabs)');
+
+        // Directly redirect based on the user's role
+        if (userData.role === 'coach') {
+          router.replace('/(tabs)/homeCoach');
+        } else {
+          router.replace('/(tabs)/HomeScreen');
+        }
       } else {
         Alert.alert('Erreur', 'Profil utilisateur incomplet');
       }
@@ -92,8 +89,20 @@ export default function LoginScreen() {
                   <Text style={styles.loginButtonText}>Se connecter</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.outlineButton}>
+                <TouchableOpacity style={styles.outlineButton} onPress={() => router.push('/auth/registerScreen')}>
                   <Text style={styles.outlineButtonText}>Créer ton compte</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{
+                    backgroundColor: "#E6E2D8", // même couleur que "Se connecter"
+                    paddingVertical: 12,
+                    borderRadius: 25,
+                    marginTop: 40, // espace pour le descendre
+                    alignItems: "center"
+                  }}
+                  onPress={() => router.push('/auth/LoginScreen')}
+                >
+                  <Text style={{ fontWeight: "bold", color: "#000" }}>Vous êtes client ?</Text>
                 </TouchableOpacity>
               </>
             )}

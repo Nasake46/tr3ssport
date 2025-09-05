@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TextInput,
   View,
@@ -13,24 +13,93 @@ import {
 import { useRouter } from 'expo-router';
 import { styles } from '../styles/auth/LoginScreen.styles';
 
+// Firebase
+import { auth, firestore } from '@/firebase';
+import { signInWithEmailAndPassword, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+
+// Google sign-in (Expo)
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_IDS = {
+  expo: 'TON_CLIENT_ID_EXPO_APPS',
+  ios: 'TON_CLIENT_ID_IOS',
+  android: 'TON_CLIENT_ID_ANDROID',
+  web: 'TON_CLIENT_ID_WEB',
+};
+
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = () => {
+  // Google auth request
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: GOOGLE_CLIENT_IDS.expo,
+    iosClientId: GOOGLE_CLIENT_IDS.ios,
+    androidClientId: GOOGLE_CLIENT_IDS.android,
+    webClientId: GOOGLE_CLIENT_IDS.web,
+    responseType: 'id_token',
+  });
+
+  // Handle Google response
+  useEffect(() => {
+    const run = async () => {
+      if (response?.type !== 'success') return;
+      const idToken = response.authentication?.idToken;
+      if (!idToken) {
+        Alert.alert('Erreur', 'Token Google manquant.');
+        return;
+      }
+      try {
+        setLoading(true);
+        const credential = GoogleAuthProvider.credential(idToken);
+        const userCred = await signInWithCredential(auth, credential);
+        const snap = await getDoc(doc(firestore, 'users', userCred.user.uid));
+        if (!snap.exists()) {
+          Alert.alert('Erreur', 'Profil utilisateur incomplet');
+          return;
+        }
+        const data = snap.data() as { role?: string };
+        Alert.alert('Succès', 'Connexion réussie avec Google !');
+        if (data.role === 'coach') router.replace('/(tabs)/homeCoach');
+        else router.replace('/(tabs)/HomeScreen');
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Erreur', 'Échec de connexion Google.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [response]);
+
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
-
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      setLoading(true);
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDoc(doc(firestore, 'users', userCred.user.uid));
+      if (!snap.exists()) {
+        Alert.alert('Erreur', 'Profil utilisateur incomplet');
+        return;
+      }
+      const data = snap.data() as { role?: string };
       Alert.alert('Succès', 'Connexion réussie !');
-      router.replace('/(tabs)');
-    }, 1000);
+      if (data.role === 'coach') router.replace('/(tabs)/homeCoach');
+      else router.replace('/(tabs)/HomeScreen');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Erreur', 'Impossible de se connecter. Vérifiez vos identifiants.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,7 +140,7 @@ export default function LoginScreen() {
               <Text style={styles.loginButtonText}>Se connecter</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.outlineButton}>
+            <TouchableOpacity style={styles.outlineButton} onPress={() => router.push('/auth/RegisterClient')}>
               <Text style={styles.outlineButtonText}>Créer ton compte</Text>
             </TouchableOpacity>
           </>
@@ -86,12 +155,19 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.socials}>
-          <Text style={styles.social}>G</Text>
+          <TouchableOpacity
+            onPress={() => promptAsync()}
+            disabled={!request || loading}
+            style={{ opacity: !request || loading ? 0.5 : 1 }}
+          >
+            <Text style={styles.social}>G</Text>
+          </TouchableOpacity>
+
           <Text style={styles.social}>f</Text>
           <Text style={styles.social}></Text>
         </View>
 
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/auth/Login2')}>
           <Text style={styles.coachLink}>Vous êtes coach ?</Text>
         </TouchableOpacity>
       </View>

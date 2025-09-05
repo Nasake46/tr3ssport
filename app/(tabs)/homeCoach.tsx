@@ -124,6 +124,21 @@ export default function CoachHomeScreen() {
             </View>
             <Text style={styles.menuText}>Mes documents</Text>
           </TouchableOpacity>
+          {/* Modifier ma page (ouvre profilCoach en mode édition) */}
+<TouchableOpacity
+  style={styles.menuButton}
+  onPress={() =>
+    router.push({ pathname: '/(tabs)/profilCoach', params: { edit: '1' } } as any)
+  }
+>
+  <View className="icon" style={styles.iconCircle}>
+    <Ionicons name="create-outline" size={24} color="#7667ac" />
+  </View>
+  <Text style={styles.menuText}>Modifier ma page</Text>
+</TouchableOpacity>
+
+
+          
           
           <TouchableOpacity 
             style={styles.menuButton}
@@ -188,6 +203,7 @@ export default function CoachHomeScreen() {
             </View>
             <Text style={styles.menuText}>Setup Admin</Text>
           </TouchableOpacity>
+          
 
           {/* Bouton Refresh - pour recharger les données */}
           <TouchableOpacity 
@@ -204,10 +220,10 @@ export default function CoachHomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Menu secondaire avec rendez-vous */}
-        <View style={styles.secondaryMenuContainer}>
+                 {/* Menu secondaire avec rendez-vous + créer séance */}
+        <View style={[styles.secondaryMenuContainer, { flexDirection: 'row', gap: 12 }]}>
           <TouchableOpacity 
-            style={styles.appointmentButton}
+            style={[styles.appointmentButton, { flex: 1 }]}
             onPress={() => router.push('/coachDashboard')}
           >
             <View style={styles.appointmentIconCircle}>
@@ -215,7 +231,19 @@ export default function CoachHomeScreen() {
             </View>
             <Text style={styles.appointmentText}>Mes rendez-vous</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.appointmentButton, { flex: 1 }]}
+            onPress={() => router.push('/appointments/create')}
+          >
+            <View style={styles.appointmentIconCircle}>
+              <Ionicons name="add-circle-outline" size={24} color="#0E6B5A" />
+            </View>
+            <Text style={styles.appointmentText}>Créer une séance</Text>
+          </TouchableOpacity>
         </View>
+
+
 
         {/* Alertes */}
         <Text style={styles.sectionTitle}>Notifications</Text>

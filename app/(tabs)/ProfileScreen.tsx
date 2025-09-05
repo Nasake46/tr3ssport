@@ -9,10 +9,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialIcons, FontAwesome5, Feather } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5, Feather } from '@expo/vector-icons';
 import { auth, firestore } from '@/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth'; // <-- ajout du signOut
 import { styles } from '../styles/account/ProfileScreen.styles';
 
 export default function ProfileScreen() {
@@ -22,23 +22,31 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState('');
   const router = useRouter();
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const docRef = doc(firestore, 'users', user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setFirstName(data.firstName);
-        setLastName(data.lastName);
-        setEmail(data.email);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(firestore, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFirstName(data.firstName);
+          setLastName(data.lastName);
+          setEmail(data.email);
+        }
       }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace('/'); // redirection après déconnexion
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
     }
-  });
-
-  return () => unsubscribe();
-}, []);
-
+  };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -60,7 +68,7 @@ useEffect(() => {
         </TouchableOpacity>
         <View style={styles.line} />
 
-        <TouchableOpacity style={styles.option}>
+        <TouchableOpacity style={styles.option} onPress={() => router.push('/(tabs)/devis')}>
           <FontAwesome5 name="cc-visa" size={20} color="#04403A" />
           <Text style={styles.optionText}>Facturation</Text>
         </TouchableOpacity>
@@ -96,7 +104,7 @@ useEffect(() => {
         <View style={styles.line} />
 
         {/* Logout */}
-        <TouchableOpacity style={styles.logout}>
+        <TouchableOpacity style={styles.logout} onPress={handleLogout}>
           <Text style={styles.logoutText}>Déconnexion</Text>
           <Feather name="log-out" size={18} color="white" style={{ marginLeft: 8 }} />
         </TouchableOpacity>

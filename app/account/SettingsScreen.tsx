@@ -13,6 +13,9 @@ import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { styles } from '../styles/account/SettingsScreen.styles';
 
+
+
+
 export default function SettingsScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -21,6 +24,8 @@ export default function SettingsScreen() {
   const [address, setAddress] = useState('123 Rue Exemple, Paris');
   const [password, setPassword] = useState('');
 
+
+  
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
