@@ -130,7 +130,7 @@ export default function LoginScreen() {
           secureTextEntry
         />
 
-        <Text style={styles.forgot}>Mot de passe oublié ?</Text>
+        <Text style={styles.forgot} onPress={() => router.push('/auth/ForgottenPassword')}>Mot de passe oublié ?</Text>
 
         {loading ? (
           <ActivityIndicator size="large" color="#F4AF00" />
@@ -174,8 +174,8 @@ export default function LoginScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerTitle}>Contact</Text>
-        <Text style={styles.footerText}>(01) 45 35 37 83</Text>
-        <Text style={styles.footerText}>contact@company.com</Text>
+        <Text style={styles.footerText}>06 79 41 14 38</Text>
+        <Text style={styles.footerText}>direction@tressport.fr</Text>
       </View>
     </KeyboardAvoidingView>
   );

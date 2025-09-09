@@ -12,7 +12,7 @@ export default function CoachHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRouterReady, setIsRouterReady] = useState(false);
-
+  
   useEffect(() => {
     // Attendre que le router soit prêt
     const timer = setTimeout(() => {
@@ -21,6 +21,7 @@ export default function CoachHomeScreen() {
 
     return () => clearTimeout(timer);
   }, []);
+  
 
   const navigateToPage = (path: string) => {
     if (!isRouterReady) {
@@ -95,18 +96,24 @@ export default function CoachHomeScreen() {
         {/* En-tête */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Mon tableau de bord</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profilCoach')}>
-            <View style={styles.profileCircle}>
-              <Text style={styles.profileText}>Coach 1</Text>
-            </View>
-          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profilCoach')} style={{ alignItems: 'center' }}>
+  <View style={styles.profileCircle}>
+    <Text style={styles.profileText}>
+      {(coachData?.firstName?.[0] ?? 'C') + (coachData?.lastName?.[0] ?? '')}
+    </Text>
+  </View>
+  <Text style={styles.profileName}>
+    {`${coachData?.firstName ?? ''} ${coachData?.lastName ?? ''}`.trim() || 'Coach'}
+  </Text>
+</TouchableOpacity>
+
         </View>
         
         {/* Menus principaux */}
         <View style={styles.menuContainer}>
           <TouchableOpacity style={styles.menuButton}>
             <View style={styles.iconCircle}>
-              <Ionicons name="people" size={24} color="#7667ac" />
+              <Ionicons name="people" size={24} color="#fff"/>
             </View>
             <Text style={styles.menuText}>Mes clients</Text>
           </TouchableOpacity>
@@ -125,20 +132,24 @@ export default function CoachHomeScreen() {
             <Text style={styles.menuText}>Mes documents</Text>
           </TouchableOpacity>
           {/* Modifier ma page (ouvre profilCoach en mode édition) */}
-<TouchableOpacity
-  style={styles.menuButton}
-  onPress={() =>
-    router.push({ pathname: '/(tabs)/profilCoach', params: { edit: '1' } } as any)
-  }
->
-  <View className="icon" style={styles.iconCircle}>
-    <Ionicons name="create-outline" size={24} color="#7667ac" />
-  </View>
-  <Text style={styles.menuText}>Modifier ma page</Text>
-</TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() =>
+              router.push({ pathname: '/(tabs)/profilCoach', params: { edit: '1' } } as any)
+            }
+          >
+            <View className="icon" style={styles.iconCircle}>
+              <Ionicons name="create-outline" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Modifier ma page</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuButton} onPress={() => router.push('/messaging' as any)}>
+           <View style={styles.iconCircle}>
+             <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+           </View>
+           <Text style={styles.menuText}>Messages</Text>
+         </TouchableOpacity>
 
-
-          
           
           <TouchableOpacity 
             style={styles.menuButton}
@@ -370,11 +381,13 @@ export default function CoachHomeScreen() {
   );
 }
 
+
+const COLORS = {
+  oxford: '#121631',   // bleu foncé
+  bone:   '#E1DDCC',   // beige
+  };
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-    backgroundColor: "#F5F5F8",
-  },
+  scrollView: { flex: 1, backgroundColor: "#FFFFFF" },
   container: {
     flex: 1,
     padding: 16,
@@ -386,11 +399,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#7667ac',
-  },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.oxford },
   profileCircle: {
     width: 50,
     height: 50,
@@ -415,19 +424,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F0F0F5',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+   width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.oxford,
+   borderWidth: 1,
+   borderColor: 'rgba(255,255,255,0.18)',
+   justifyContent: 'center',
+   alignItems: 'center',
+   marginBottom: 8,
+ },
   menuText: {
     fontSize: 12,
-    color: '#7667ac',
+    color: COLORS.oxford,
     textAlign: 'center',
   },
   sectionTitle: {
@@ -442,6 +448,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
   },
+  profileName: { marginTop: 4, fontSize: 12, fontWeight: '600', color: '#7667ac', textAlign: 'center' },
+
   alertBox: {
     flex: 1,
     backgroundColor: 'white',
@@ -508,7 +516,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   weeklySessionsButton: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.bone,
     borderRadius: 10,
     padding: 15,
     flexDirection: 'row',
@@ -643,7 +651,7 @@ const styles = StyleSheet.create({
   },
   appointmentButton: {
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.oxford,
     borderRadius: 15,
     padding: 15,
     minWidth: 140,
@@ -666,7 +674,7 @@ const styles = StyleSheet.create({
   },
   appointmentText: {
     fontSize: 13,
-    color: '#7667ac',
+    color: '#fff',
     textAlign: 'center',
     fontWeight: '500',
   },

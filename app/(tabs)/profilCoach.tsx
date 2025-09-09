@@ -6,6 +6,13 @@ import { auth, firestore } from '@/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 
+const COLORS = {
+  oxford: '#121631',   // bleu foncé
+  line:   '#E5E7EB',   // séparateurs
+  textSub:'#667085',
+  white:  '#FFFFFF',
+};
+
 export default function ProfileCoachScreen() {
   const router = useRouter();
   const { edit } = useLocalSearchParams<{ edit?: string }>();
@@ -127,21 +134,36 @@ export default function ProfileCoachScreen() {
   return (
     <ScrollView style={styles.scroll}>
       <View style={styles.container}>
+        {/* Titre */}
         <View style={styles.headerRow}>
-          <Text style={styles.h1}>Mon profil coach</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={styles.secondary} onPress={() => setIsEditing(e => !e)}>
-              <Ionicons name={isEditing ? 'eye' : 'create'} size={18} color="#7667ac" />
-              <Text style={styles.secondaryTxt}>{isEditing ? 'Prévisualiser' : 'Modifier'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.primary, { opacity: isEditing ? 1 : 0.6 }]}
-              disabled={!isEditing || saving}
-              onPress={save}
-            >
-              <Text style={styles.primaryTxt}>{saving ? 'Enregistrement...' : 'Enregistrer'}</Text>
-            </TouchableOpacity>
-          </View>
+  <TouchableOpacity
+    style={styles.backBtn}
+    onPress={() => (router.replace('/homeCoach'))}
+  >
+    <Ionicons name="chevron-back" size={20} color={COLORS.oxford} />
+  </TouchableOpacity>
+
+  <Text style={styles.h1}>Mon profil coach</Text>
+
+  {/* espaceur pour équilibrer la ligne */}
+  <View style={{ width: 36 }} />
+</View>
+
+
+        {/* Actions sous le titre */}
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.secondary} onPress={() => setIsEditing(e => !e)}>
+            <Ionicons name={isEditing ? 'eye' : 'create'} size={18} color={COLORS.oxford} />
+            <Text style={styles.secondaryTxt}>{isEditing ? 'Prévisualiser' : 'Modifier'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.primary, { opacity: isEditing ? 1 : 0.6 }]}
+            disabled={!isEditing || saving}
+            onPress={save}
+          >
+            <Text style={styles.primaryTxt}>{saving ? 'Enregistrement...' : 'Enregistrer'}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Infos personnelles */}
@@ -221,7 +243,7 @@ export default function ProfileCoachScreen() {
                 style={[styles.secondary, { marginTop: 8, alignSelf: 'flex-start' }]}
                 onPress={() => router.push({ pathname: '/coachScreen', params: { coachId: auth.currentUser?.uid || '' } })}
               >
-                <Ionicons name="eye" size={18} color="#7667ac" />
+                <Ionicons name="eye" size={18} color={COLORS.oxford} />
                 <Text style={styles.secondaryTxt}>Prévisualiser ma page coach</Text>
               </TouchableOpacity>
             </>
@@ -235,7 +257,7 @@ export default function ProfileCoachScreen() {
                 style={[styles.secondary, { marginTop: 8, alignSelf: 'flex-start' }]}
                 onPress={() => router.push({ pathname: '/coachScreen', params: { coachId: auth.currentUser?.uid || '' } })}
               >
-                <Ionicons name="eye" size={18} color="#7667ac" />
+                <Ionicons name="eye" size={18} color={COLORS.oxford} />
                 <Text style={styles.secondaryTxt}>Voir ma page coach</Text>
               </TouchableOpacity>
             </>
@@ -259,7 +281,7 @@ function Field({
 }) {
   return (
     <View style={{ marginBottom: 12 }}>
-      <Text style={{ fontSize: 13, color: '#667085', marginBottom: 6 }}>{label}</Text>
+      <Text style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 6 }}>{label}</Text>
       <TextInput style={styles.input} value={value} onChangeText={onChange} keyboardType={keyboardType} placeholder="" />
     </View>
   );
@@ -268,58 +290,86 @@ function Field({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-      <Text style={{ color: '#667085' }}>{label}</Text>
+      <Text style={{ color: COLORS.textSub }}>{label}</Text>
       <Text style={{ color: '#101828', fontWeight: '600' }}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { backgroundColor: '#F8F9FB' },
+  scroll: { backgroundColor: COLORS.white },
   container: { flex: 1, padding: 16 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  h1: { fontSize: 22, fontWeight: '700', color: '#04403A' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  h1: { fontSize: 22, fontWeight: '700', color: COLORS.oxford },
+
+  // Actions sous le titre (alignées et clean)
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+
   primary: {
-    backgroundColor: '#7667ac',
-    borderRadius: 10,
+    backgroundColor: COLORS.oxford,
+    borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryTxt: { color: '#fff', fontWeight: '700' },
+
   secondary: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#7667ac',
-    borderRadius: 10,
+    borderColor: COLORS.oxford,
+    borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  secondaryTxt: { color: '#7667ac', fontWeight: '700' },
+  secondaryTxt: { color: COLORS.oxford, fontWeight: '700' },
+
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 14,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: COLORS.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 2,
+    elevation: 1,
   },
-  h2: { fontSize: 16, fontWeight: '700', color: '#04403A', marginBottom: 10 },
+  backBtn: {
+  width: 36,
+  height: 36,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: COLORS.white,
+},
+
+  h2: { fontSize: 16, fontWeight: '700', color: COLORS.oxford, marginBottom: 10 },
+
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
+    borderColor: COLORS.line,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    color: '#101828',
   },
   textArea: { minHeight: 100, textAlignVertical: 'top' },
+
   p: { color: '#475467' },
 });

@@ -112,8 +112,8 @@ export default function LoginScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerTitle}>Contact</Text>
-        <Text style={styles.footerText}>(01) 45 35 37 83</Text>
-        <Text style={styles.footerText}>contact@company.com</Text>
+        <Text style={styles.footerText}>06 79 41 14 38</Text>
+        <Text style={styles.footerText}>direction@tressport.fr</Text>
       </View>
     </KeyboardAvoidingView>
   );

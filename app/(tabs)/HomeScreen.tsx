@@ -86,13 +86,19 @@ const HomeScreen = () => {
               <Text style={styles.text_base}>Suivi</Text>
             </View>
           </TouchableOpacity>
+          
         </View>
-
+<TouchableOpacity onPress={() => router.push('/messaging')}>
+  <View style={styles.messageBar}>
+    <Ionicons name="chatbubbles-outline" size={20} color="#fff" />
+    <Text style={styles.messageBarText}>Messages</Text>
+  </View>
+</TouchableOpacity>
         {/* Sessions */}
         <View className="sessions" style={styles.sessions}>
           <View>
-            <Text style={styles.text_h1}>Séances</Text>
-            <Text style={styles.text_base}>Lorem ipsum dolor sit, amet culpa.</Text>
+            <Text style={styles.text_h1}>Mes Séances</Text>
+            <Text style={styles.text_base}>Consultez vos séances à venir.</Text>
           </View>
           <TouchableOpacity style={styles.button} onPress={() => router.push('/appointments/client-dashboard')}>
             <Text style={styles.buttonText}>Consulter</Text>
@@ -102,7 +108,7 @@ const HomeScreen = () => {
         {/* Upcoming Sessions */}
         <TouchableOpacity style={styles.big_session} onPress={() => router.push('../invitations')}>
           <Text style={styles.text_h1}>Séances à venir</Text>
-          <Text style={styles.paragraph}>Lorem ipsum dolor sit, amet consectetur adipisicing elit</Text>
+          <Text style={styles.paragraph}>Les invitations que vous avez reçues</Text>
           <View style={styles.chips}>
             <View style={styles.chip}><Text style={styles.chipTxt}>Renforcement</Text></View>
             <View style={styles.chip}><Text style={styles.chipTxt}>Cardio</Text></View>
@@ -204,7 +210,25 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#fff', fontWeight: '700' },
 
-  // big session card
+  messageBar: {
+  marginTop: 12,
+  marginHorizontal: 20,
+  backgroundColor: COLORS.primary,
+  borderRadius: 22,
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  elevation: 2,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.08,
+  shadowRadius: 2,
+},
+messageBarText: { color: '#fff', fontWeight: '700' },
+
   big_session: {
     marginHorizontal: 20,
     marginTop: 12,
