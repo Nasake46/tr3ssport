@@ -92,7 +92,7 @@ export default function LoginScreen() {
       }
       const data = snap.data() as { role?: string };
       Alert.alert('Succès', 'Connexion réussie !');
-      if (data.role === 'coach') router.replace('/(tabs)/homeCoach');
+      if (data.role === 'coach' || data.role === 'admin') router.replace('/(tabs)/homeCoach');
       else router.replace('/(tabs)/HomeScreen');
     } catch (e) {
       console.error(e);

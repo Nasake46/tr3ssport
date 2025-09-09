@@ -38,7 +38,7 @@ export default function LoginScreen() {
         Alert.alert('Succès', 'Connexion réussie !');
 
         // Directly redirect based on the user's role
-        if (userData.role === 'coach') {
+        if (userData.role === 'coach' || userData.role === 'admin') {
           router.replace('/(tabs)/homeCoach');
         } else {
           router.replace('/(tabs)/HomeScreen');

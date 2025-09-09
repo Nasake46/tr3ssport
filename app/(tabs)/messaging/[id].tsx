@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { firestore } from '../../../firebase';
 import {
@@ -50,7 +49,6 @@ export default function Conversation() {
 
   // ↓ pour gérer l'espace du notch + tab bar et baisser un peu la flèche
   const insets = useSafeAreaInsets();
-  const tabBarH = useBottomTabBarHeight();
 
   // Temps réel
   useEffect(() => {
@@ -100,7 +98,7 @@ export default function Conversation() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={(Platform.OS === 'ios' ? 64 : 0) + Math.max(tabBarH - 12, 0)}
+        keyboardVerticalOffset={(Platform.OS === 'ios' ? 64 : 0) + Math.max(12, 0)}
       >
         {/* Header — flèche un peu plus basse via paddingTop dynamique */}
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -122,7 +120,7 @@ export default function Conversation() {
           renderItem={renderItem}
           contentContainerStyle={{
             padding: 12,
-            paddingBottom: 8 + Math.max(tabBarH - 12, 0) + insets.bottom + 44
+            paddingBottom: 8 + Math.max( 12, 0) + insets.bottom + 44
           }}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="interactive"
@@ -130,7 +128,7 @@ export default function Conversation() {
         />
 
         {/* Barre d’envoi (au-dessus du tab bar) */}
-        <View style={[styles.inputBar, { paddingBottom: insets.bottom + Math.max(0), marginBottom: -89 }]}>
+        <View style={[styles.inputBar, { paddingBottom: insets.bottom + Math.max(0), marginBottom: -50 }]}>
         
           <TextInput
             style={styles.input}

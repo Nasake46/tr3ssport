@@ -156,8 +156,8 @@ const HomeScreen = () => {
         </View>
 
         {/* Carrousels */}
-        <CarouselArticles />
-        <CarousselHealthArticle />
+        {/* <CarouselArticles /> */}
+        {/* <CarousselHealthArticle /> */}
         <View style={styles.line} />
         <CarouselCoachs />
       </ScrollView>

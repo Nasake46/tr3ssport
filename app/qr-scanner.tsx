@@ -178,7 +178,7 @@ export default function QRScannerScreen() {
           </Text>
           <TouchableOpacity 
             style={styles.loginButton}
-            onPress={() => router.push('/(tabs)/LoginScreen')}
+            onPress={() => router.push('/auth/LoginScreen')}
           >
             <Text style={styles.loginButtonText}>Se connecter</Text>
           </TouchableOpacity>

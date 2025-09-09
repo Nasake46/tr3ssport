@@ -12,10 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { collection, getDocs, addDoc, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { getAuth } from 'firebase/auth';
 import Fuse from 'fuse.js';
+
 import { Ionicons } from '@expo/vector-icons';
 
 type Contact = { id: string; name: string; conversationId: string };
@@ -156,6 +157,26 @@ export default function MessagingScreen() {
     await updateDoc(doc(firestore, 'contactRequests', requestId), { status: 'rejected' });
     fetchContactRequests();
   };
+  const goHomeByRole = async () => {
+  const user = getAuth().currentUser;
+  if (!user) {
+    router.replace('/(tabs)'); // fallback
+    return;
+  }
+  try {
+    const snap = await getDoc(doc(firestore, 'users', user.uid));
+    const roleRaw = snap.exists() ? (snap.data() as any).role : 'user';
+    const role = String(roleRaw || 'user').toLowerCase();
+
+    if (role === 'coach' || role === 'admin') {
+      router.replace('/(tabs)/homeCoach'); // coach home
+    } else {
+      router.replace('/HomeScreen');       // user home
+    }
+  } catch {
+    router.replace('/HomeScreen');
+  }
+};
 
   const createGroupConversation = async () => {
     if (!currentUser) return;
@@ -186,9 +207,10 @@ export default function MessagingScreen() {
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.replace('/HomeScreen')}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.primaryDark} />
-        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconBtn} onPress={goHomeByRole}>
+  <Ionicons name="arrow-back" size={22} color={COLORS.primaryDark} />
+</TouchableOpacity>
+
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity style={[styles.iconBtn, { borderColor: COLORS.primary }]} onPress={fetchUsers}>
