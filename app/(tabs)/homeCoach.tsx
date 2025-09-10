@@ -3,7 +3,19 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-nati
 import { useRouter } from 'expo-router';
 import { auth, firestore } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import {
+  onSnapshot,
+  limit as fbLimit,
+  doc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  getCountFromServer,
+  Timestamp,
+} from 'firebase/firestore';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 
 export default function CoachHomeScreen() {
@@ -12,6 +24,18 @@ export default function CoachHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRouterReady, setIsRouterReady] = useState(false);
+
+  type AppointmentLite = {
+    id: string;
+    sessionType?: string;
+    location?: string;
+    date?: any;           // Firestore Timestamp
+    createdBy?: string;   // uid
+    userEmail?: string;
+    createdAt?: any;
+  };
+  const [pendingReqs, setPendingReqs] = useState<AppointmentLite[]>([]);
+  const [pendingErr, setPendingErr] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsRouterReady(true), 100);
@@ -22,19 +46,93 @@ export default function CoachHomeScreen() {
   const [myReviews, setMyReviews] = useState<Review[]>([]);
   const [avg, setAvg] = useState<string>('—');
 
+  const [stats, setStats] = useState<{ week: number; month: number }>({ week: 0, month: 0 });
+
+  // --- Helpers dates (semaine Lundi->Dimanche) ---
+  const startOfWeek = (d = new Date()) => {
+    const x = new Date(d);
+    const day = (x.getDay() + 6) % 7; // 0 = lundi
+    x.setHours(0, 0, 0, 0);
+    x.setDate(x.getDate() - day);
+    return x;
+  };
+  const endOfWeek = (d = new Date()) => {
+    const s = startOfWeek(d);
+    const e = new Date(s);
+    e.setDate(s.getDate() + 7);
+    return e;
+  };
+  const startOfMonth = (d = new Date()) => {
+    const x = new Date(d.getFullYear(), d.getMonth(), 1);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
+  const endOfMonth = (d = new Date()) => {
+    const x = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
+
   const loadMyReviews = async (coachUid: string) => {
     try {
-      const q = query(
+      const qReviews = query(
         collection(firestore, 'coachReviews'),
         where('coachId', '==', coachUid),
         orderBy('createdAt', 'desc')
       );
-      const snap = await getDocs(q);
+      const snap = await getDocs(qReviews);
       const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
       setMyReviews(list);
       setAvg(list.length ? (list.reduce((s, r) => s + (r.rating || 0), 0) / list.length).toFixed(1) : '—');
     } catch (e) {
       console.log('loadMyReviews error', e);
+    }
+  };
+
+  // Fallback de comptage si index manquant
+  const safeCount = async (qRef: any) => {
+    try {
+      const snap = await getCountFromServer(qRef);
+      return snap.data().count;
+    } catch (e: any) {
+      if (e?.code === 'failed-precondition') {
+        // index composite pas encore créé -> fallback one-shot
+        const docs = await getDocs(qRef);
+        return docs.size;
+      }
+      throw e;
+    }
+  };
+
+  const loadStats = async (coachUid: string) => {
+    try {
+      const weekStart = Timestamp.fromDate(startOfWeek());
+      const weekEnd = Timestamp.fromDate(endOfWeek());
+      const monthStart = Timestamp.fromDate(startOfMonth());
+      const monthEnd = Timestamp.fromDate(endOfMonth());
+
+      const base = collection(firestore, 'appointments');
+
+      const qWeek = query(
+        base,
+        where('coachIds', 'array-contains', coachUid),
+        where('sessionStartedAt', '>=', weekStart),
+        where('sessionStartedAt', '<', weekEnd)
+      );
+
+      const qMonth = query(
+        base,
+        where('coachIds', 'array-contains', coachUid),
+        where('sessionStartedAt', '>=', monthStart),
+        where('sessionStartedAt', '<', monthEnd)
+      );
+
+      const [cWeek, cMonth] = await Promise.all([safeCount(qWeek), safeCount(qMonth)]);
+      setStats({ week: cWeek, month: cMonth });
+    } catch (e) {
+      console.log('loadStats error', e);
+      // Fallback silencieux (on garde la dernière valeur connue)
+      setStats(s => s);
     }
   };
 
@@ -58,8 +156,7 @@ export default function CoachHomeScreen() {
         setCoachData(userData);
         const admin = role === 'admin';
         setIsAdmin(admin);
-        // 🔑 charge les avis du coach connecté
-        await loadMyReviews(user.uid);
+        await Promise.all([loadMyReviews(user.uid), loadStats(user.uid)]);
       } else {
         router.replace('/(tabs)');
       }
@@ -69,6 +166,49 @@ export default function CoachHomeScreen() {
       setLoading(false);
     }
   };
+
+  // Abonnement en temps réel aux demandes en attente
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const coachUid = user.uid;
+
+    const base = collection(firestore, 'appointments');
+    const qLive = query(
+      base,
+      where('coachIds', 'array-contains', coachUid),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc'),
+      fbLimit(25)
+    );
+
+    const unsub = onSnapshot(
+      qLive,
+      (snap) => {
+        setPendingErr(null);
+        setPendingReqs(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      },
+      async (err) => {
+        console.warn('Notifications pending onSnapshot error', err);
+        setPendingErr('Index en cours de création…');
+
+        // Fallback sans orderBy
+        try {
+          const qFallback = query(
+            base,
+            where('coachIds', 'array-contains', coachUid),
+            where('status', '==', 'pending')
+          );
+          const s2 = await getDocs(qFallback);
+          setPendingReqs(s2.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+        } catch (e) {
+          console.error('Fallback pending fetch error', e);
+        }
+      }
+    );
+
+    return () => unsub();
+  }, [router]);
 
   useEffect(() => { fetchCoachData(); }, [router]);
 
@@ -105,7 +245,10 @@ export default function CoachHomeScreen() {
 
         {/* Menus principaux */}
         <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuButton}>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => router.push('/ClientsScreen' as any)}
+          >
             <View style={styles.iconCircle}>
               <Ionicons name="people" size={24} color="#fff" />
             </View>
@@ -151,6 +294,18 @@ export default function CoachHomeScreen() {
           </TouchableOpacity>
 
           {/* ===== Admin only ===== */}
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => navigateToPage('/pay-coach')}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: '#0E6B5A' }]}>
+                <Ionicons name="card" size={24} color="#fff" />
+              </View>
+              <Text style={styles.menuText}>Rémunérer un coach</Text>
+            </TouchableOpacity>
+          )}
+
           {isAdmin && (
             <TouchableOpacity style={styles.menuButton} onPress={() => router.push('/simple-stop-test' as any)}>
               <View style={styles.iconCircle}>
@@ -237,45 +392,54 @@ export default function CoachHomeScreen() {
 
         {/* Notifications */}
         <Text style={styles.sectionTitle}>Notifications</Text>
-        <View style={styles.alertsContainer}>
-          <View style={styles.alertBox}>
-            <View style={styles.alertTextContainer}>
-              <Text style={styles.alertText}>Bienvenue dans votre espace coach</Text>
-              <Ionicons name="checkmark-circle" size={16} color="green" style={styles.alertIcon} />
+
+        {pendingReqs.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            {pendingReqs.map((r) => {
+              const when = (() => {
+                try {
+                  const d = r.date?.toDate ? r.date.toDate() : null;
+                  return d
+                    ? `${d.toLocaleDateString('fr-FR')} • ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                    : '';
+                } catch { return ''; }
+              })();
+
+              return (
+                <TouchableOpacity
+                  key={r.id}
+                  style={styles.alertBox}
+                  onPress={() => navigateToPage(`/appointments/manage/${r.id}`)}
+                >
+                  <View style={styles.alertTextContainer}>
+                    <Text style={[styles.alertText, { fontWeight: '700', marginBottom: 4 }]}>
+                      Demande de séance en attente
+                    </Text>
+                  </View>
+                  <Text style={{ color: '#667085' }}>
+                    {r.sessionType || 'Séance'} • {r.location || 'Lieu à préciser'}
+                  </Text>
+                  {!!when && <Text style={{ color: '#667085', marginTop: 2 }}>{when}</Text>}
+                  {!!r.userEmail && <Text style={{ color: '#999', marginTop: 2 }}>{r.userEmail}</Text>}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.alertsContainer}>
+            <View style={styles.alertBox}>
+              <View style={styles.alertTextContainer}>
+                <Text style={styles.alertText}>Bienvenue dans votre espace coach</Text>
+                <Ionicons name="checkmark-circle" size={16} color="green" style={styles.alertIcon} />
+              </View>
+              {!!pendingErr && (
+                <Text style={{ color: '#999', marginTop: 6, fontStyle: 'italic' }}>
+                  {pendingErr}
+                </Text>
+              )}
             </View>
           </View>
-        </View>
-
-        {/* Séances du jour */}
-        <Text style={styles.sectionTitle}>Mes clients du jour</Text>
-        <View style={styles.sessionsContainer}>
-          <View style={styles.sessionCard}>
-            <View style={styles.sessionImagePlaceholder} />
-            <Text style={styles.clientName}>Client 1</Text>
-            <Text style={styles.sessionTime}>Programme personnalisé</Text>
-          </View>
-
-          <View style={styles.sessionCard}>
-            <View style={styles.sessionImagePlaceholder} />
-            <Text style={styles.clientName}>Client 3</Text>
-            <Text style={styles.sessionTime}>Suivi progression</Text>
-          </View>
-
-          <View style={styles.sessionCard}>
-            <View style={styles.sessionImagePlaceholder} />
-            <Text style={styles.clientName}>Client 6</Text>
-            <Text style={styles.sessionTime}>Conseil nutrition</Text>
-          </View>
-        </View>
-
-        {/* Voir séances de la semaine */}
-        <TouchableOpacity style={styles.weeklySessionsButton}>
-          <View style={styles.weeklySessionsContent}>
-            <Text style={styles.weeklySessionsText}>Voir mes clients de la semaine</Text>
-            <Text style={styles.weeklySessionsCount}>Vous suivez 12 clients cette semaine</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color="#7667ac" />
-        </TouchableOpacity>
+        )}
 
         {/* Avis et recommandations */}
         <Text style={styles.sectionTitle}>Avis et recommandations</Text>
@@ -315,25 +479,6 @@ export default function CoachHomeScreen() {
             ))}
           </View>
         )}
-
-        {/* Statistiques */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statTitle}>Séances assurés</Text>
-            <Text style={styles.statValue}>56</Text>
-            <Text style={styles.statSubValue}>+15% cette semaine</Text>
-          </View>
-
-          <View style={styles.statBox}>
-            <Text style={styles.statTitle}>Avis moyen</Text>
-            <Text style={styles.statValue}>4.8</Text>
-            <View style={styles.statStars}>
-              {[...Array(5)].map((_, i) => (
-                <FontAwesome key={i} name={i < 4 ? 'star' : i === 4 ? 'star-half-o' : 'star-o'} size={16} color="#7667ac" />
-              ))}
-            </View>
-          </View>
-        </View>
 
         {/* Partenaires de santé */}
         <View style={styles.partnersSection}>
@@ -405,11 +550,11 @@ const styles = StyleSheet.create({
   reviewerName: { fontSize: 12, flex: 1 },
   starsContainer: { flexDirection: 'row' },
   reviewText: { fontSize: 11, color: '#666', lineHeight: 16 },
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10, gap: 10 },
-  statBox: { flex: 1, backgroundColor: '#F0F0F5', padding: 15, borderRadius: 10, alignItems: 'center' },
-  statTitle: { fontSize: 14, color: '#7667ac', marginBottom: 10 },
+  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10, gap: 10, flexWrap: 'wrap' },
+  statBox: { flexBasis: '32%', backgroundColor: '#F0F0F5', padding: 15, borderRadius: 10, alignItems: 'center' },
+  statTitle: { fontSize: 14, color: '#7667ac', marginBottom: 10, textAlign: 'center' },
   statValue: { fontSize: 24, fontWeight: 'bold', color: '#7667ac' },
-  statSubValue: { fontSize: 12, color: '#4CAF50', marginTop: 5 },
+  statSubValue: { fontSize: 12, color: '#666', marginTop: 5, textAlign: 'center' },
   statStars: { flexDirection: 'row', marginTop: 5 },
   partnersSection: { marginTop: 15, flexDirection: 'row', justifyContent: 'space-between' },
   partnersIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0F5', justifyContent: 'center', alignItems: 'center' },

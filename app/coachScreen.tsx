@@ -16,6 +16,7 @@ import MapView, { Marker } from 'react-native-maps';
 import * as Linking from 'expo-linking';
 import { styles } from '../app/styles/coachScreen.styles';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { auth, firestore } from '@/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import CarouselRecommandations from '@/components/CarouselRecommandations';
@@ -46,6 +47,9 @@ interface CoachProfile {
   serviceAreas?: string[];
   videoUrl?: string;
   location?: { lat?: number; lng?: number };
+  email?: string;            // ajouté pour contact
+  contactEmail?: string;     // ajouté pour contact
+  phone?: string;            // optionnel: fallback téléphone
 }
 
 type Review = {
@@ -101,7 +105,7 @@ export default function CoachScreen() {
 
   const currentUser = auth.currentUser;
   const uid = currentUser?.uid || null;
-
+  
   /* ====== Charger le coach ====== */
   useEffect(() => {
     const run = async () => {
@@ -155,7 +159,6 @@ export default function CoachScreen() {
       const snap = await getDocs(qRef);
       const row = snap.docs[0] ? ({ id: snap.docs[0].id, ...(snap.docs[0].data() as any) } as Review) : null;
       setMyReview(row);
-      // si on entre en édition à partir d’un avis existant
       if (row) {
         setEditRating(row.rating);
         setEditComment(row.comment);
@@ -172,7 +175,6 @@ export default function CoachScreen() {
 
   useEffect(() => {
     loadMyReview();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coach?.id, uid]);
 
   /* ====== États dérivés / droits ====== */
@@ -194,7 +196,6 @@ export default function CoachScreen() {
     try {
       setSubmitting(true);
 
-      // par sécurité, revérifie qu’il n’en existe pas déjà un
       const existsQ = query(
         collection(firestore, 'coachReviews'),
         where('coachId', '==', coach!.id),
@@ -316,8 +317,30 @@ export default function CoachScreen() {
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('Erreur', 'Impossible de définir ce coach. Réessayez plus tard.');
+      Alert.alert('Erreur', "Impossible de définir ce coach. Réessayez plus tard.");
     }
+  };
+
+  /* ====== Contact coach (email / téléphone fallback) ====== */
+  const fullName = `${coach?.firstName ?? ''} ${coach?.lastName ?? ''}`.trim() || 'Coach';
+  const coachEmail = (coach?.contactEmail || coach?.email || '').trim();
+  const coachPhone = (coach?.phone || '').trim();
+
+  const handleContactCoach = async () => {
+    if (coachEmail) {
+      const subject = `Contact – ${fullName}`;
+      const body = `Bonjour ${coach?.firstName || fullName},\n\n`;
+      const url = `mailto:${coachEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      try {
+        const supported = await Linking.canOpenURL(url);
+        await Linking.openURL(supported ? url : `mailto:${coachEmail}`);
+        return;
+      } catch {}
+    }
+    if (coachPhone) {
+      try { await Linking.openURL(`tel:${coachPhone}`); return; } catch {}
+    }
+    Alert.alert('Contact indisponible', "Ce coach n'a pas renseigné d'email ou de téléphone.");
   };
 
   /* ====== Rendu ====== */
@@ -339,7 +362,6 @@ export default function CoachScreen() {
     );
   }
 
-  const fullName = `${coach.firstName ?? ''} ${coach.lastName ?? ''}`.trim() || 'Coach';
   const price = coach.pricePerHour ?? 78;
   const seniority = coach.seniorityYears ?? 3;
   const specialties = coach.specialties ?? ['Renforcement musculaire', 'Cardio', 'Souplesse'];
@@ -384,7 +406,7 @@ export default function CoachScreen() {
                 <Text style={styles.reductionNote}>Après déduction d’impôts</Text>
               </View>
 
-              <TouchableOpacity style={styles.primaryButton} onPress={() => Linking.openURL('mailto:contact@example.com')}>
+              <TouchableOpacity style={[styles.primaryButton, !coachEmail && !coachPhone && { opacity: 0.6 }]} onPress={handleContactCoach}>
                 <Text style={styles.primaryButtonText}>Contacter</Text>
               </TouchableOpacity>
 
@@ -401,7 +423,7 @@ export default function CoachScreen() {
               {isOwner && (
                 <TouchableOpacity
                   style={styles.primaryButton}
-                  onPress={() => router.push({ pathname: '/(tabs)/profilCoach', params: { edit: '1' } } as any)}
+                  onPress={() => router.push({ pathname: '/EditCoachScreen', params: { edit: '1' } } as any)}
                 >
                   <Text style={styles.primaryButtonText}>Modifier ma page</Text>
                 </TouchableOpacity>
@@ -446,9 +468,13 @@ export default function CoachScreen() {
 
           {/* CTA */}
           <View style={styles.ctaBlock}>
-            <TouchableOpacity style={styles.ctaButton} onPress={() => Alert.alert('Réservation', 'Bientôt disponible')}>
-              <Text style={styles.ctaButtonText}>Réserver une séance d’essai</Text>
-            </TouchableOpacity>
+            <TouchableOpacity
+  style={styles.ctaButton}
+  onPress={() => router.push({ pathname: '[coachId]', params: { coachId: coach.id } } as any)}
+>
+  <Text style={styles.ctaButtonText}>Demander une séance</Text>
+</TouchableOpacity>
+
           </View>
 
           {/* Zone de déplacement */}
@@ -461,16 +487,6 @@ export default function CoachScreen() {
                 </View>
               ))}
             </View>
-          </View>
-
-          {/* Map */}
-          <View style={styles.mapContainer}>
-            <MapView
-              style={styles.map}
-              initialRegion={{ latitude: lat, longitude: lng, latitudeDelta: 0.1, longitudeDelta: 0.1 }}
-            >
-              <Marker coordinate={{ latitude: lat, longitude: lng }} title="Zone d’intervention" description="Paris et alentours" />
-            </MapView>
           </View>
 
           {/* Démo vidéo */}

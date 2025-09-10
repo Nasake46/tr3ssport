@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { firestore } from '../firebase';
-import * as userService from '../services/userService';
 import { router } from 'expo-router';
 
 type Application = {
@@ -44,11 +43,19 @@ export default function AdminCoachApprovals() {
     setActing(app.id);
     try {
       // 1) Marquer la demande comme approuvée
-      await updateDoc(doc(firestore, 'coachApplications', app.id), { status: 'approved', approvedAt: new Date() });
-      // 2) Mettre à jour le rôle de l'utilisateur
-      await userService.updateUserRole(app.userId, 'coach');
-      // 3) Mettre à jour un flag côté user doc
-      await updateDoc(doc(firestore, 'users', app.userId), { coachApplicationStatus: 'approved', updatedAt: new Date() });
+      await updateDoc(doc(firestore, 'coachApplications', app.id), {
+        status: 'approved',
+        approvedAt: new Date(),
+      });
+
+      // 2) Mettre à jour le user associé
+      await updateDoc(doc(firestore, 'users', app.userId), {
+        role: 'coach',
+        coachApplicationStatus: 'approved',
+        coachApprovedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
       setItems(prev => prev.filter(i => i.id !== app.id));
     } catch (e: any) {
       console.error('Erreur approbation:', e);
@@ -61,8 +68,16 @@ export default function AdminCoachApprovals() {
   const reject = async (app: Application) => {
     setActing(app.id);
     try {
-      await updateDoc(doc(firestore, 'coachApplications', app.id), { status: 'rejected', rejectedAt: new Date() });
-      await updateDoc(doc(firestore, 'users', app.userId), { coachApplicationStatus: 'rejected', updatedAt: new Date() });
+      await updateDoc(doc(firestore, 'coachApplications', app.id), {
+        status: 'rejected',
+        rejectedAt: new Date(),
+      });
+
+      await updateDoc(doc(firestore, 'users', app.userId), {
+        coachApplicationStatus: 'rejected',
+        updatedAt: new Date(),
+      });
+
       setItems(prev => prev.filter(i => i.id !== app.id));
     } catch (e: any) {
       console.error('Erreur rejet:', e);

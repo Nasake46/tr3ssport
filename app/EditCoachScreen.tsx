@@ -23,11 +23,21 @@ import {
   deleteObject,
   uploadBytesResumable,
 } from 'firebase/storage';
+import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { router } from 'expo-router';
+const COLORS = {
+  oxford: '#121631',   // bleu foncé
+  line:   '#E5E7EB',   // séparateurs
+  textSub:'#667085',
+  white:  '#FFFFFF',
+};
+
 
 export default function EditCoachScreen() {
+  
   const auth = getAuth();
   const insets = useSafeAreaInsets();
 
@@ -381,18 +391,17 @@ export default function EditCoachScreen() {
 
           <Label>Vidéo (YouTube)</Label>
           <TextInput style={styles.input} value={videoUrlText} onChangeText={setVideoUrlText} placeholder="https://…" />
+          <TouchableOpacity
+                style={[styles.secondary, { marginTop: 8, alignSelf: 'flex-start' }]}
+                onPress={() => router.push({ pathname: '/coachScreen', params: { coachId: auth.currentUser?.uid || '' } })}
+              >
+                <Ionicons name="eye" size={18} color={COLORS.oxford} />
+                <Text style={styles.secondaryTxt}>Voir ma page coach</Text>
+              </TouchableOpacity>
 
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <Label>Latitude</Label>
-              <TextInput style={styles.input} value={latInput} onChangeText={setLatInput} keyboardType="decimal-pad" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Label>Longitude</Label>
-              <TextInput style={styles.input} value={lngInput} onChangeText={setLngInput} keyboardType="decimal-pad" />
-            </View>
-          </View>
+          
         </ScrollView>
+        
 
         <View style={[styles.footerBar, { paddingBottom: 12 + insets.bottom }]}>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={uploading || saving}>
@@ -419,4 +428,16 @@ const styles = StyleSheet.create({
   footerBar: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 10, borderTopWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 12 },
   smallBtn: { backgroundColor: '#0F473C', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
   smallBtnText: { color: '#fff', fontWeight: '600' },
+  secondary: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.oxford,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  secondaryTxt: { color: COLORS.oxford, fontWeight: '700' },
 });
