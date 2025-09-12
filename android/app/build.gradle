@@ -87,7 +87,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.tr3ssport"
+    namespace "com.nasakeorg.tr3ssport"
     defaultConfig {
         applicationId 'com.nasakeorg.tr3ssport'
         minSdkVersion rootProject.ext.minSdkVersion
