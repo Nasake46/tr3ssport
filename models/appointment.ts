@@ -13,6 +13,8 @@ export interface Appointment {
   // Nouveau: stockage direct pour requêtes rapides
   coachIds?: string[]; // liste des coachs liés
   participantsIds?: string[]; // liste des userId connus (créateur + coachs + clients identifiés)
+  clientIds?: string[]; // uniquement les userId des clients attendus (créateur + clients identifiés)
+  participantsClientIds?: string[]; // alias demandé: liste des IDs clients (même contenu que clientIds) sans collision avec 'participants' détaillé
 }
 
 export interface AppointmentParticipant {

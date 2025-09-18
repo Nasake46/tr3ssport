@@ -8,7 +8,8 @@ import {
   query, 
   where, 
   Timestamp,
-  writeBatch
+  writeBatch,
+  onSnapshot
 } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import { 
@@ -25,6 +26,12 @@ import {
   scanParticipantQRCode as _scanParticipantQRCode,
   getQRCodeStatus as _getQRCodeStatus,
 } from './qr';
+import {
+  startSessionManually as _startSessionManually,
+  finalizeSession as _finalizeSession,
+  markParticipantPresent as _markParticipantPresent,
+  markParticipantAbsent as _markParticipantAbsent
+} from './attendanceService';
 // DEBUG flag central (mettez true en dev pour réactiver les logs verbeux de ce module)
 const DEBUG_APT = false;
 const logApt = (...args: any[]) => { if (DEBUG_APT) console.log(...args); };
@@ -140,7 +147,9 @@ export const createAppointment = async (
       createdAt: Timestamp.now() as any,
       updatedAt: Timestamp.now() as any,
       coachIds: [...cleanedFormData.coachIds],
-      participantsIds: [userId, ...cleanedFormData.coachIds], // sera enrichi après ajout éventuel d'invités enregistrés
+  participantsIds: [userId, ...cleanedFormData.coachIds], // sera enrichi après
+  clientIds: [userId], // créateur toujours client
+  participantsClientIds: [userId],
     };
     
     logApt('📝 CRÉATION RDV - Données appointment préparées:', appointmentData);
@@ -210,8 +219,13 @@ export const createAppointment = async (
       const userIds: string[] = [];
       participantsSnap.forEach(p => { const d: any = p.data(); if (d.userId) userIds.push(d.userId); });
       const unique = Array.from(new Set([userId, ...formData.coachIds, ...userIds]));
+      const clientUserIds: string[] = [];
+      participantsSnap.forEach(p => { const d: any = p.data(); if (d.role==='client' && d.userId) clientUserIds.push(d.userId); });
+      const uniqueClients = Array.from(new Set([userId, ...clientUserIds]));
       await updateDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId), {
         participantsIds: unique,
+        clientIds: uniqueClients,
+        participantsClientIds: uniqueClients,
       });
       logApt('🔄 CRÉATION RDV - participantsIds mis à jour:', unique.length);
     } catch (e) {
@@ -445,7 +459,8 @@ export const updateParticipantStatus = async (
             if (allAccepted && aptData.globalStatus !== 'confirmed') newStatus = 'confirmed';
             else if (anyDeclined && aptData.globalStatus !== 'declined') newStatus = 'declined';
             if (newStatus) {
-              await updateDoc(aptRef, { globalStatus: newStatus, updatedAt: Timestamp.now() });
+              // Écrit à la fois globalStatus (legacy) et status (champ demandé)
+              await updateDoc(aptRef, { globalStatus: newStatus, status: newStatus, updatedAt: Timestamp.now() });
               logApt('🔁 MAJ STATUT GLOBAL - Nouveau statut:', newStatus, 'appointmentId:', appointmentId);
             }
           }
@@ -457,6 +472,62 @@ export const updateParticipantStatus = async (
   } catch (error) {
     console.error('❌ MAJ STATUT PARTICIPANT - Erreur:', error);
     throw error;
+  }
+};
+
+/**
+ * Réponse simplifiée d'un coach à un rendez-vous:
+ *  - Met à jour (si possible) le participant coach (status + joinedAt)
+ *  - Met immédiatement à jour le globalStatus du rendez‑vous (confirmed|declined)
+ * Objectif: refléter tout de suite l'acceptation/refus comme demandé.
+ */
+export const respondToAppointment = async (
+  appointmentId: string,
+  coachId: string,
+  decision: 'accepted' | 'declined'
+): Promise<void> => {
+  try {
+    const aptRef = doc(firestore, APPOINTMENTS_COLLECTION, appointmentId);
+    const aptSnap = await getDoc(aptRef);
+    if (!aptSnap.exists()) return;
+
+    // 1. Tenter MAJ participant (best effort)
+    try {
+      const partsSnap = await getDocs(query(
+        collection(firestore, PARTICIPANTS_COLLECTION),
+        where('appointmentId','==', appointmentId),
+        where('role','==','coach'),
+        where('userId','==', coachId)
+      ));
+      if (!partsSnap.empty) {
+        const p = partsSnap.docs[0];
+        try {
+          await updateDoc(p.ref, {
+            status: decision,
+            joinedAt: decision === 'accepted' ? Timestamp.now() : (p.data() as any).joinedAt || undefined,
+            updatedAt: Timestamp.now()
+          });
+        } catch (e) {
+          // Ignore si les règles bloquent: on poursuit le globalStatus
+          warnApt('⚠️ respondToAppointment - Impossible de mettre à jour participant coach (ignoré)', e);
+        }
+      }
+    } catch (e) {
+      warnApt('⚠️ respondToAppointment - Recherche participant échouée', e);
+    }
+
+    // 2. MAJ directe du globalStatus
+  const newGlobal = decision === 'accepted' ? 'confirmed' : 'declined';
+    try {
+  await updateDoc(aptRef, { globalStatus: newGlobal, status: newGlobal, updatedAt: Timestamp.now() });
+      logApt('✅ respondToAppointment - globalStatus mis à', newGlobal);
+    } catch (e) {
+      console.error('❌ respondToAppointment - Echec MAJ globalStatus', e);
+      throw e;
+    }
+  } catch (e) {
+    console.error('❌ respondToAppointment - Erreur générale', e);
+    throw e;
   }
 };
 
@@ -921,48 +992,85 @@ export const getActiveSessionForCoach = async (coachId: string): Promise<any|nul
   } catch (e) { console.warn('⚠️ getActiveSessionForCoach erreur', e); return null; }
 };
 
-export const manualStartSession = async (appointmentId: string, coachId: string) => {
-  try {
-    const ref = doc(firestore, APPOINTMENTS_COLLECTION, appointmentId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return { success:false, message:'Séance introuvable' };
-    const data:any = snap.data();
-    if (data.globalStatus === 'started') return { success:true, message:'Déjà démarrée' };
-    await updateDoc(ref,{ globalStatus:'started', sessionStartedAt: Timestamp.now(), sessionStartedBy: coachId, startMode:'manual', updatedAt: Timestamp.now() });
-    return { success:true, message:'Séance démarrée manuellement' };
-  } catch { return { success:false, message:'Erreur démarrage manuel' }; }
-};
+// Wrapper centralisé (attendanceService)
+export const manualStartSession = async (appointmentId: string, coachId: string) => _startSessionManually(appointmentId, coachId);
 
 export const subscribeToAttendanceProgress = (appointmentId: string, cb:(data:any)=>void) => {
-  // Placeholder no-op (implementation temps réel à ajouter si besoin)
-  console.warn('subscribeToAttendanceProgress placeholder - no realtime listener implemented');
-  cb({ appointmentId, presentCount:0, totalClients:0 });
-  return () => {};
+  try {
+    const qClients = query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==', appointmentId), where('role','==','client'));
+    const unsub = onSnapshot(qClients, async (snap) => {
+      let present = 0; const clients: any[] = [];
+      snap.forEach(d => { const data: any = d.data(); if (data.attendanceStatus === 'present') present++; clients.push({ id:d.id, name: data.displayName || data.name || data.email || data.userId, email: data.email, attendanceStatus: data.attendanceStatus, attendanceOrder: data.attendanceOrder }); });
+      // Total attendu: préférer appointment.clientIds s'il existe
+      let total = snap.size;
+      try {
+        const aptDoc = await getDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId));
+        if (aptDoc.exists()) {
+          const a:any = aptDoc.data();
+          if (Array.isArray(a.clientIds) && a.clientIds.length>0) total = a.clientIds.length;
+        }
+      } catch {}
+      const absent = Math.max(0, total - present);
+      cb({ appointmentId, present, total, absent, clients });
+    });
+    return () => { try { unsub(); } catch {} };
+  } catch (e) {
+    console.warn('subscribeToAttendanceProgress error', e);
+    cb({ appointmentId, present:0, total:0, absent:0, clients:[] });
+    return () => {};
+  }
 };
 
 export const getSessionAttendanceDetails = async (appointmentId: string) => {
   try {
-    const partsSnap = await getDocs(query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==',appointmentId), where('role','==','client')));
-    const clients:any[] = []; let present=0; partsSnap.forEach(p=>{ const d:any=p.data(); if(d.attendanceStatus==='present') present++; clients.push({ id:p.id, ...d }); });
-    return { appointmentId, presentCount: present, totalClients: clients.length, clients };
-  } catch { return { appointmentId, presentCount:0, totalClients:0, clients:[] }; }
+    const partsSnap = await getDocs(
+      query(
+        collection(firestore, PARTICIPANTS_COLLECTION),
+        where('appointmentId', '==', appointmentId),
+        where('role', '==', 'client')
+      )
+    );
+    const clients: any[] = [];
+    let present = 0;
+    partsSnap.forEach((p) => {
+      const d: any = p.data();
+      if (d.attendanceStatus === 'present') present++;
+      clients.push({
+        id: p.id,
+        name: d.displayName || d.name || d.email || d.userId,
+        email: d.email,
+        attendanceStatus: d.attendanceStatus,
+        attendanceOrder: d.attendanceOrder,
+        qrScannedAt: d.qrScannedAt,
+      });
+    });
+    // Charger le RDV pour récupérer clientIds et la date
+    let total = clients.length;
+    let aptDate: Date | undefined = undefined;
+    try {
+      const aptDoc = await getDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId));
+      if (aptDoc.exists()) {
+        const a: any = aptDoc.data();
+        if (Array.isArray(a.clientIds) && a.clientIds.length > 0) total = a.clientIds.length;
+        aptDate = a.date?.toDate?.() || undefined;
+      }
+    } catch {}
+    const absent = Math.max(0, total - present);
+    return { appointmentId, present, total, absent, clients, appointment: { date: aptDate } };
+  } catch {
+    return { appointmentId, present: 0, total: 0, absent: 0, clients: [], appointment: { date: undefined } };
+  }
 };
 
 export const setParticipantAttendanceStatus = async (participantId: string, status:'present'|'absent') => {
   try { await updateDoc(doc(firestore, PARTICIPANTS_COLLECTION, participantId), { attendanceStatus: status, updatedAt: Timestamp.now() }); return { success:true }; } catch { return { success:false }; }
 };
 
-export const endSession = async (appointmentId: string, coachId: string) => {
-  try {
-    const ref = doc(firestore, APPOINTMENTS_COLLECTION, appointmentId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return { success:false, message:'Séance introuvable' };
-    const data:any = snap.data();
-    if (data.globalStatus !== 'started') return { success:false, message:'Séance non démarrée' };
-    await updateDoc(ref,{ globalStatus:'completed', sessionEndedAt: Timestamp.now(), sessionEndedBy: coachId, updatedAt: Timestamp.now() });
-    return { success:true, message:'Séance terminée' };
-  } catch { return { success:false, message:'Erreur fin séance' }; }
-};
+export const endSession = async (appointmentId: string, coachId: string) => _finalizeSession(appointmentId, coachId);
+
+// Exports de marquage de présence / absence (centralisés via attendanceService)
+export const markParticipantPresent = _markParticipantPresent;
+export const markParticipantAbsent = _markParticipantAbsent;
 
 const recomputeGlobalStatusIfNeeded = async (appointmentId: string, appointmentData: any, participants: any[]) => {
   try {
@@ -976,7 +1084,7 @@ const recomputeGlobalStatusIfNeeded = async (appointmentId: string, appointmentD
     const allAccepted = coachParticipants.every(c => c.status === 'accepted');
     if (allAccepted) {
       try {
-        await updateDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId), { globalStatus: 'confirmed', updatedAt: Timestamp.now() });
+  await updateDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId), { globalStatus: 'confirmed', status:'confirmed', updatedAt: Timestamp.now() });
         logApt('🔁 RECOMPUTE STATUS - Auto passage à confirmed pour', appointmentId);
         return 'confirmed';
       } catch (e) { warnApt('⚠️ RECOMPUTE STATUS - Echec update', appointmentId, e); }

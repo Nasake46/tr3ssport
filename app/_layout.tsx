@@ -66,17 +66,16 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
   <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="qr-test" options={{ 
-          title: 'Test QR Code',
-          headerShown: true,
-          presentation: 'modal'
-        }} />
         <Stack.Screen name="test-new-features" options={{
           title: 'Test New Features',
           headerShown: true,
           presentation: 'modal'
         }} />
-        <Stack.Screen name="coachActiveSession" options={{ title: 'Séance active', headerShown: true }} />
+        <Stack.Screen name="coachActiveSession" options={{
+          // écran legacy redirigé vers /sessionAttendance
+          title: 'Assiduité',
+          headerShown: false,
+        }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

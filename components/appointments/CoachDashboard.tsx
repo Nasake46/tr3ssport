@@ -163,11 +163,12 @@ export default function CoachDashboard() {
           location: raw.location || '',
           description: raw.description || '',
           date: raw.date?.toDate() || new Date(),
-          status: 'pending',
+          // status sera dérivé ci-dessous (status ou fallback globalStatus)
           createdAt: raw.createdAt?.toDate() || new Date(),
           clientName,
           clientEmail,
           coachParticipants,
+          status: (raw as any).status || raw.globalStatus || 'pending',
           globalStatus: raw.globalStatus
         };
         appointmentsList.push(appointment);

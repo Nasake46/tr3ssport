@@ -1,4 +1,5 @@
 import { Timestamp, doc, getDoc, updateDoc, addDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { markParticipantPresent } from './attendanceService';
 import { firestore } from '../firebase';
 import { SCAN_QR_ERROR_CODES, SCAN_PARTICIPANT_ERROR_CODES } from './errors';
 
@@ -97,19 +98,27 @@ export const scanQRCode = async (qrToken: string, coachId: string): Promise<{ su
   } catch {}
   if (!isAssigned) return { success: false, message: "Vous n'êtes pas assigné à cette séance", errorCode: SCAN_QR_ERROR_CODES.APPT_COACH_NOT_ASSIGNED };
   const clientsSnap = await getDocs(query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==',appointmentId), where('role','==','client')));
-  let totalClients=0; let presentCount=0; const clientDocs: any[] = []; clientsSnap.forEach(d=>{ const pd:any=d.data(); clientDocs.push({id:d.id,...pd}); totalClients++; if(pd.attendanceStatus==='present') presentCount++; });
+  let totalClients=0; let presentCount=0; const clientDocs: any[] = []; clientsSnap.forEach(d=>{ const pd:any=d.data(); clientDocs.push({id:d.id,...pd}); if(pd.attendanceStatus==='present') presentCount++; });
+  // Si clientIds est présent sur le doc appointment, l'utiliser comme source de vérité pour le total attendu
+  if (Array.isArray(appointmentData.clientIds) && appointmentData.clientIds.length>0) {
+    totalClients = appointmentData.clientIds.length;
+  } else {
+    totalClients = clientDocs.length; // fallback
+  }
   if (totalClients === 0) {
-    // Cas anormal: au moins le créateur devrait être présent comme participant client
-    const diagnostics = {
-      appointmentId,
-      hasCreator: !!appointmentData.createdBy,
-      creatorId: appointmentData.createdBy || null,
-      creatorInParticipants: clientDocs.some(c=>c.userId===appointmentData.createdBy),
-      clientDocs,
-      coachIds: appointmentData.coachIds || [],
-      globalStatus: appointmentData.globalStatus,
-    };
-    return { success:false, message:'Aucun participant client trouvé pour cette séance (anomalie)', errorCode: SCAN_QR_ERROR_CODES.APPT_NO_CLIENT_PARTICIPANTS, appointmentId, diagnostics, presentCount, totalClients };
+    // Auto-réparation: créer le participant client pour le créateur si manquant
+    try {
+      const creatorId = appointmentData.createdBy;
+      if (creatorId) {
+        const creatorUserSnap = await getDoc(doc(firestore,'users',creatorId));
+        const creatorEmail = creatorUserSnap.exists() ? ((creatorUserSnap.data() as any).email || '') : '';
+        await addDoc(collection(firestore, PARTICIPANTS_COLLECTION), { appointmentId, userId: creatorId, email: creatorEmail, role:'client', status:'accepted', attendanceStatus:'pending', joinedAt: Timestamp.now(), createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
+        await updateDoc(appointmentRef, { clientIds: [creatorId], participantsClientIds:[creatorId], participantsIds: [creatorId, ...(appointmentData.coachIds||[])] });
+        return { success:false, message:'Participant créateur reconstruit. Rescanner le QR.', errorCode: SCAN_QR_ERROR_CODES.APPT_NO_CLIENT_PARTICIPANTS, appointmentId, presentCount:0, totalClients:1 };
+      }
+    } catch {}
+    const diagnostics = { appointmentId, hasCreator: !!appointmentData.createdBy };
+    return { success:false, message:'Aucun participant client trouvé (auto-réparation échouée)', errorCode: SCAN_QR_ERROR_CODES.APPT_NO_CLIENT_PARTICIPANTS, appointmentId, diagnostics, presentCount, totalClients };
   }
   const allPresent = (presentCount===totalClients && totalClients>0);
   if (appointmentData.globalStatus === 'started') {
@@ -117,11 +126,12 @@ export const scanQRCode = async (qrToken: string, coachId: string): Promise<{ su
     return { success:true, message:'Séance déjà démarrée', appointmentId, appointmentTime: appointmentDate.toISOString(), duration, errorCode: SCAN_QR_ERROR_CODES.APPT_ALREADY_STARTED, presentCount, totalClients };
   }
   if (!allPresent) {
+    try { console.log('[DEBUG QR] WAITING_CLIENTS appointmentId', appointmentId, 'presentCount', presentCount, 'totalClients', totalClients, 'clientIds', Array.isArray(appointmentData.clientIds)?appointmentData.clientIds: 'none'); } catch {}
     if (appointmentData.qrStatus !== 'generated') { try { await updateDoc(appointmentRef,{ qrStatus:'generated', updatedAt:Timestamp.now() }); } catch {} }
     return { success:false, message:`Tous les clients ne sont pas encore scannés (${presentCount}/${totalClients}). Démarrez manuellement ou continuez les scans clients.`, errorCode: SCAN_QR_ERROR_CODES.APPT_WAITING_CLIENTS, appointmentId, duration, presentCount, totalClients };
   }
   try {
-    await updateDoc(appointmentRef,{ sessionStartedAt:Timestamp.now(), sessionStartedBy:coachId, globalStatus:'started', startMode: appointmentData.startMode || 'auto_qr_all_present', qrStatus:'scanned', updatedAt:Timestamp.now() });
+  await updateDoc(appointmentRef,{ sessionStartedAt:Timestamp.now(), sessionStartedBy:coachId, globalStatus:'started', status:'started', startMode: appointmentData.startMode || 'auto_qr_all_present', qrStatus:'scanned', updatedAt:Timestamp.now() });
   } catch { return { success:false, message:'Erreur démarrage', errorCode: SCAN_QR_ERROR_CODES.APPT_INTERNAL_ERROR }; }
   let clientName='Client';
   try { const creatorDoc = await getDoc(doc(firestore,'users',appointmentData.createdBy)); if (creatorDoc.exists()) { const ud:any=creatorDoc.data(); clientName = ud.displayName || ud.email || 'Client'; } } catch {}
@@ -146,10 +156,51 @@ export const generateParticipantQRCode = async (appointmentId:string, userId:str
     const now = new Date();
     if (now.getTime() < aptDate.getTime() - 30*60*1000) return { success:false, message:'Génération trop tôt' };
     const qPart = query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==',appointmentId), where('userId','==',userId), where('role','==','client'));
-    const partSnap = await getDocs(qPart);
-    if (partSnap.empty) return { success:false, message:'Participant client introuvable' };
-    const participantDoc = partSnap.docs[0];
-    const participantData:any = participantDoc.data();
+    let partSnap = await getDocs(qPart);
+    let participantDoc:any = partSnap.docs[0];
+    let participantData:any = participantDoc ? participantDoc.data() : null;
+    if (partSnap.empty) {
+      // 1) Tentative correspondance par email (participant pré-créé via invitation sans userId)
+      let userEmail = '';
+      try { const us = await getDoc(doc(firestore,'users',userId)); if (us.exists()) { const ud:any = us.data(); userEmail = (ud.email||'').toLowerCase(); } } catch {}
+      if (userEmail) {
+        try {
+          const byEmailSnap = await getDocs(query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==',appointmentId), where('role','==','client'), where('email','==',userEmail)));
+          if (!byEmailSnap.empty) {
+            participantDoc = byEmailSnap.docs[0];
+            participantData = participantDoc.data();
+            // Lier le userId si absent
+            try { await updateDoc(doc(firestore, PARTICIPANTS_COLLECTION, participantDoc.id), { userId, updatedAt: Timestamp.now(), status: participantData.status || 'accepted', joinedAt: participantData.joinedAt || Timestamp.now() }); } catch {}
+          }
+        } catch {}
+      }
+      // 2) Si toujours pas trouvé -> auto-création inconditionnelle (invité qui se présente la première fois)
+      if (!participantDoc) {
+        try {
+          const newRef = await addDoc(collection(firestore, PARTICIPANTS_COLLECTION), {
+            appointmentId,
+            userId,
+            email: userEmail,
+            role:'client',
+            status:'accepted',
+            attendanceStatus:'pending',
+            joinedAt: Timestamp.now(),
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          participantDoc = await getDoc(newRef);
+          participantData = participantDoc.data();
+          // Mise à jour des listes agrégées
+          const newClientIds = Array.isArray(appointmentData.clientIds) ? Array.from(new Set([...appointmentData.clientIds, userId])) : [userId];
+          const newParticipantsIds = Array.isArray(appointmentData.participantsIds) ? Array.from(new Set([...appointmentData.participantsIds, userId])) : [userId];
+          const newParticipantsClientIds = Array.isArray(appointmentData.participantsClientIds) ? Array.from(new Set([...appointmentData.participantsClientIds, userId])) : [userId];
+          try { await updateDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId), { clientIds: newClientIds, participantsIds: newParticipantsIds, participantsClientIds: newParticipantsClientIds, updatedAt: Timestamp.now() }); } catch {}
+        } catch (e) {
+          console.warn('[QR] Auto-création participant client échouée (fallback)', e);
+          return { success:false, message:'Participant client introuvable' };
+        }
+      }
+    }
     if (participantData.attendanceStatus==='present') return { success:false, message:'Déjà enregistré comme présent' };
     if (participantData.qrToken && participantData.qrGeneratedAt) {
       const genDate:Date = participantData.qrGeneratedAt.toDate();
@@ -182,13 +233,24 @@ export const scanParticipantQRCode = async (qrToken:string, coachId:string) => {
       let presentCount=0; let totalClients=0; cs.forEach(d=>{ const cd:any=d.data(); totalClients++; if(cd.attendanceStatus==='present') presentCount++; });
       return { success:true, message:'Déjà enregistré', participant:{ participantId, role:'client', attendanceOrder: partData.attendanceOrder, name: partData.name || partData.displayName || partData.email, email: partData.email }, presentCount, totalClients, appointmentId, errorCode: SCAN_PARTICIPANT_ERROR_CODES.PARTICIPANT_ALREADY_PRESENT };
     }
-    const beforeSnap = await getDocs(query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==',appointmentId), where('role','==','client')));
-    let presentBefore=0; beforeSnap.forEach(d=>{ const cd:any=d.data(); if (cd.attendanceStatus==='present') presentBefore++; });
-    const attendanceOrder = presentBefore + 1;
-    await updateDoc(doc(firestore, PARTICIPANTS_COLLECTION, participantId), { attendanceStatus:'present', attendanceOrder, qrScannedAt: Timestamp.now(), updatedAt: Timestamp.now(), qrToken: null });
+  const beforeSnap = await getDocs(query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==',appointmentId), where('role','==','client')));
+  let presentBefore=0; beforeSnap.forEach(d=>{ const cd:any=d.data(); if (cd.attendanceStatus==='present') presentBefore++; });
+  // Utilise le service central pour présence + logs (ignorer order calculé localement, le service recalculera si besoin)
+  try { await updateDoc(doc(firestore, PARTICIPANTS_COLLECTION, participantId), { qrToken: null }); } catch {}
+  const markRes = await markParticipantPresent(appointmentId, participantId, coachId);
+  if (!markRes.success) return { success:false, message: markRes.message || 'Erreur présence', errorCode: 'ATTENDANCE_ERROR' };
+  const attendanceOrder = markRes.order;
     const cs2 = await getDocs(query(collection(firestore, PARTICIPANTS_COLLECTION), where('appointmentId','==',appointmentId), where('role','==','client')));
-    let presentCount=0; let totalClients=0; let allPresent=true; cs2.forEach(d=>{ const cd:any=d.data(); totalClients++; if(cd.attendanceStatus==='present') presentCount++; else allPresent=false; });
-    let autoStarted=false; if (allPresent && aptData.globalStatus!=='started' && !aptData.sessionStartedAt) { try { await updateDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId), { sessionStartedAt: Timestamp.now(), sessionStartedBy: coachId, globalStatus:'started', startMode:'auto_last_participant', updatedAt: Timestamp.now() }); autoStarted=true; } catch {} }
-    return { success:true, message:'Présence enregistrée', participant:{ participantId, role:'client', attendanceOrder, name: partData.name || partData.displayName || partData.email, email: partData.email }, presentCount, totalClients, autoStarted, appointmentId };
+    let presentCount=0; let totalClients=0; let allPresent=true; cs2.forEach(d=>{ const cd:any=d.data(); if(cd.attendanceStatus==='present') presentCount++; if(cd.role==='client'){} else{} });
+    // Recalcule du total attendu via clientIds si possible
+    if (Array.isArray(aptData.clientIds) && aptData.clientIds.length>0) {
+      totalClients = aptData.clientIds.length;
+      allPresent = presentCount === totalClients;
+    } else {
+      totalClients = cs2.size; // fallback approximatif
+      allPresent = presentCount === totalClients && totalClients>0;
+    }
+  let autoStarted=false; if (allPresent && aptData.globalStatus!=='started' && !aptData.sessionStartedAt) { try { await updateDoc(doc(firestore, APPOINTMENTS_COLLECTION, appointmentId), { sessionStartedAt: Timestamp.now(), sessionStartedBy: coachId, globalStatus:'started', status:'started', startMode:'auto_last_participant', updatedAt: Timestamp.now() }); autoStarted=true; } catch {} }
+  return { success:true, message:'Présence enregistrée', participant:{ participantId, role:'client', attendanceOrder, name: partData.name || partData.displayName || partData.email, email: partData.email }, presentCount, totalClients, autoStarted, appointmentId };
   } catch { return { success:false, message:'Erreur scan', errorCode: SCAN_PARTICIPANT_ERROR_CODES.PARTICIPANT_INTERNAL_ERROR }; }
 };

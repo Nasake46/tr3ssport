@@ -112,7 +112,8 @@ export default function ClientDashboard() {
         let userStatus: 'pending' | 'accepted' | 'refused' = 'pending';
         if (apt.createdBy === currentUser.uid) {
           // L'utilisateur est le créateur - utiliser le statut global
-          userStatus = apt.globalStatus === 'confirmed' ? 'accepted' : apt.globalStatus === 'declined' ? 'refused' : 'pending';
+          const gs = (apt as any).status || apt.globalStatus;
+          userStatus = gs === 'confirmed' ? 'accepted' : gs === 'declined' ? 'refused' : 'pending';
         } else {
           // L'utilisateur est invité - trouver son statut personnel
           const userParticipant = apt.clients.find(c => c.userId === currentUser.uid || c.email === currentUser.email);

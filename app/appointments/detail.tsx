@@ -105,7 +105,11 @@ export default function AppointmentDetail() {
         location: data.location || '',
         description: data.description || '',
         date: data.date?.toDate() || new Date(),
-        status: data.globalStatus === 'confirmed' ? 'accepted' : data.globalStatus === 'declined' ? 'refused' : 'pending',
+        status: (data.status || data.globalStatus) === 'confirmed'
+          ? 'accepted'
+          : (data.status || data.globalStatus) === 'declined'
+            ? 'refused'
+            : 'pending',
         createdAt: data.createdAt?.toDate() || new Date(),
         decisions: {},
         invitedEmails: data.invitedEmails || [],
@@ -192,9 +196,9 @@ export default function AppointmentDetail() {
         }
       }
       const newStatus = responseAction === 'accepted' ? 'accepted' : 'declined';
-      console.log('[APPT_DETAIL] updateParticipantStatus invocation', { participantId: me.id, newStatus });
-      await updateParticipantStatus(me.id, newStatus);
-      console.log('[APPT_DETAIL] updateParticipantStatus terminé, rechargement participants');
+  console.log('[APPT_DETAIL] updateParticipantStatus invocation (REVERT)', { participantId: me.id, newStatus });
+  await updateParticipantStatus(me.id, newStatus); // service mettra à jour globalStatus si conditions remplies
+  console.log('[APPT_DETAIL] updateParticipantStatus terminé, rechargement participants');
       try {
         const partsSnap = await getDocs(query(collection(firestore, 'appointmentParticipants'), where('appointmentId','==', appointment.id), where('role','==','coach')));
         const coachParts = partsSnap.docs.map(d=>({ id:d.id, ...d.data() }));
