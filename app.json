@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.nasakeorg.tr3ssport",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "L'application utilise la caméra pour scanner les QR codes de présence des participants."
       }
     },
     "android": {
