@@ -411,14 +411,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },  suggestionsContainer: {
-    marginTop: 16,
-  },
-  suggestionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  },  
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',

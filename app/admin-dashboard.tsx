@@ -32,6 +32,22 @@ export default function AdminDashboard() {
     checkAdminAccess();
   }, []);
 
+  const navigateToCoachHome = () => {
+    // Accès explicite à homCoach.tsx (même dossier)
+    router.replace('./homeCoach' as any);
+  };
+
+  const headerBackBtn = () => (
+    <TouchableOpacity
+      onPress={navigateToCoachHome}
+      style={{ flexDirection: 'row', alignItems: 'center' }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Ionicons name="chevron-back" size={24} color="#007AFF" />
+      <Text style={{ color: '#007AFF', fontWeight: '600', marginLeft: 2 }}>Coach</Text>
+    </TouchableOpacity>
+  );
+
   const checkAdminAccess = async () => {
     try {
       const user = auth.currentUser;
@@ -46,7 +62,7 @@ export default function AdminDashboard() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         setUserInfo(userData);
-        
+
         if (userData.role === 'admin') {
           setIsAdmin(true);
           setIsObserver(false);
@@ -57,15 +73,15 @@ export default function AdminDashboard() {
         } else {
           setIsAdmin(false);
           Alert.alert(
-            'Accès refusé', 
-            'Vous n\'avez pas les permissions nécessaires pour accéder à cette page.',
+            'Accès refusé',
+            "Vous n'avez pas les permissions nécessaires pour accéder à cette page.",
             [{ text: 'OK', onPress: () => backOrRoleHome('user') }]
           );
         }
       } else {
         setIsAdmin(false);
         Alert.alert(
-          'Erreur', 
+          'Erreur',
           'Impossible de vérifier vos permissions.',
           [{ text: 'OK', onPress: () => backOrRoleHome('user') }]
         );
@@ -73,7 +89,7 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Erreur vérification admin:', error);
       Alert.alert(
-        'Erreur', 
+        'Erreur',
         'Une erreur est survenue lors de la vérification des permissions.',
         [{ text: 'OK', onPress: () => backOrRoleHome('user') }]
       );
@@ -101,12 +117,11 @@ export default function AdminDashboard() {
   };
 
   const navigateToSystemStats = () => {
-  router.push('./admin-stats' as any);
+    router.push('./admin-stats' as any);
   };
 
   const navigateToAppointmentOverview = () => {
-    // Placeholder pour vue d'ensemble des rendez-vous
-    Alert.alert('Bientôt disponible', 'La vue d\'ensemble des rendez-vous sera disponible prochainement');
+    Alert.alert('Bientôt disponible', "La vue d'ensemble des rendez-vous sera disponible prochainement");
   };
 
   const handleSignOut = async () => {
@@ -129,9 +144,6 @@ export default function AdminDashboard() {
       setMigrationSummary(summary);
       setLastWasDryRun(dryRun);
       console.log('🛠️ ADMIN DASHBOARD - Migration summary:', summary);
-      if (!dryRun) {
-          // rien de plus à rafraîchir ici après exécution réelle
-      }
     } catch (e: any) {
       console.error('❌ ADMIN DASHBOARD - Erreur migration:', e);
       setMigrationError(e?.message || 'Erreur migration');
@@ -143,11 +155,12 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Stack.Screen 
-          options={{ 
+        <Stack.Screen
+          options={{
             title: 'Chargement...',
-            headerBackTitle: 'Retour'
-          }} 
+            headerBackTitle: 'Retour',
+            headerLeft: headerBackBtn,
+          }}
         />
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Vérification des permissions...</Text>
@@ -158,11 +171,12 @@ export default function AdminDashboard() {
   if (!isAdmin) {
     return (
       <View style={styles.errorContainer}>
-        <Stack.Screen 
-          options={{ 
+        <Stack.Screen
+          options={{
             title: 'Accès refusé',
-            headerBackTitle: 'Retour'
-          }} 
+            headerBackTitle: 'Retour',
+            headerLeft: headerBackBtn,
+          }}
         />
         <Ionicons name="lock-closed" size={64} color="#ff4444" />
         <Text style={styles.errorTitle}>Accès refusé</Text>
@@ -175,27 +189,40 @@ export default function AdminDashboard() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           title: 'Dashboard Admin',
-          headerBackTitle: 'Retour'
-        }} 
+          headerBackTitle: 'Retour',
+          headerLeft: headerBackBtn,
+        }}
       />
-      
+
       <ScrollView style={styles.scrollView}>
         {/* Header d'accueil */}
         <View style={styles.welcomeContainer}>
-          <Ionicons name="shield-checkmark" size={32} color="#007AFF" />
-          <Text style={styles.welcomeTitle}>Dashboard Administrateur</Text>
-          <Text style={styles.welcomeSubtitle}>
-            Bienvenue, {userInfo?.firstName || 'Admin'}
-          </Text>
-        </View>
+  <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+    <TouchableOpacity
+      onPress={() => router.replace('../homeCoach' as any)}
+      style={{ flexDirection: 'row', alignItems: 'center' }}
+    >
+      <Ionicons name="chevron-back" size={24} color="#007AFF" />
+      <Text style={{ color: '#007AFF', fontWeight: '600', marginLeft: 2 }}>Coach</Text>
+    </TouchableOpacity>
+
+    <Ionicons name="shield-checkmark" size={32} color="#007AFF" />
+  </View>
+
+  <Text style={styles.welcomeTitle}>Dashboard Administrateur</Text>
+  <Text style={styles.welcomeSubtitle}>
+    Bienvenue, {userInfo?.firstName || 'Admin'}
+  </Text>
+</View>
+
 
         {/* Cartes d'action */}
         <View style={styles.cardsContainer}>
           {/* Gestion des utilisateurs */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionCard}
             onPress={navigateToUserManagement}
           >
@@ -213,9 +240,13 @@ export default function AdminDashboard() {
           </TouchableOpacity>
 
           {/* Approbation des coachs */}
-          <TouchableOpacity 
-            style={[styles.actionCard, isObserver && {opacity: 0.6}]}
-            onPress={() => isObserver ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs') : navigateToCoachApprovals()}
+          <TouchableOpacity
+            style={[styles.actionCard, isObserver && { opacity: 0.6 }]}
+            onPress={() =>
+              isObserver
+                ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs')
+                : navigateToCoachApprovals()
+            }
             disabled={isObserver}
           >
             <View style={styles.cardHeader}>
@@ -231,12 +262,14 @@ export default function AdminDashboard() {
             </View>
           </TouchableOpacity>
 
-          {/* Carte supprimée: rétrogradation des coachs (remplacée par bannissement dans les détails) */}
-
           {/* Définir rôle Observateur */}
-          <TouchableOpacity 
-            style={[styles.actionCard, isObserver && {opacity: 0.6}]}
-            onPress={() => isObserver ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs') : navigateToSetObserver()}
+          <TouchableOpacity
+            style={[styles.actionCard, isObserver && { opacity: 0.6 }]}
+            onPress={() =>
+              isObserver
+                ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs')
+                : navigateToSetObserver()
+            }
             disabled={isObserver}
           >
             <View style={styles.cardHeader}>
@@ -253,7 +286,7 @@ export default function AdminDashboard() {
           </TouchableOpacity>
 
           {/* Utilisateurs bannis */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionCard}
             onPress={navigateToBans}
           >
@@ -271,7 +304,7 @@ export default function AdminDashboard() {
           </TouchableOpacity>
 
           {/* Statistiques système */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionCard}
             onPress={navigateToSystemStats}
           >
@@ -289,7 +322,7 @@ export default function AdminDashboard() {
           </TouchableOpacity>
 
           {/* Vue d'ensemble des RDV */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionCard}
             onPress={navigateToAppointmentOverview}
           >
@@ -310,21 +343,21 @@ export default function AdminDashboard() {
         {/* Informations rapides */}
         <View style={styles.quickInfoContainer}>
           <Text style={styles.quickInfoTitle}>Informations rapides</Text>
-          
+
           <View style={styles.infoItem}>
             <Ionicons name="person" size={20} color="#666" />
             <Text style={styles.infoText}>
               Connecté en tant que: {userInfo?.email}
             </Text>
           </View>
-          
+
           <View style={styles.infoItem}>
             <Ionicons name="shield" size={20} color="#666" />
             <Text style={styles.infoText}>
               Rôle: Administrateur
             </Text>
           </View>
-          
+
           <View style={styles.infoItem}>
             <Ionicons name="time" size={20} color="#666" />
             <Text style={styles.infoText}>
@@ -337,8 +370,6 @@ export default function AdminDashboard() {
             <Text style={styles.signOutText}>Se déconnecter</Text>
           </TouchableOpacity>
         </View>
-
-  {/* (Section rétrogradation déplacée sur page dédiée) */}
 
         {/* Avertissement de sécurité */}
         <View style={styles.securityWarning}>
@@ -358,14 +389,22 @@ export default function AdminDashboard() {
             <TouchableOpacity
               style={[styles.migrationButton, { opacity: migrating ? 0.6 : 1 }]}
               disabled={migrating || isObserver}
-              onPress={() => isObserver ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs') : launchMigration(true)}
+              onPress={() =>
+                isObserver
+                  ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs')
+                  : launchMigration(true)
+              }
             >
               <Text style={styles.migrationButtonText}>Dry-run</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.migrationButtonPrimary, { opacity: migrating ? 0.6 : 1 }]}
               disabled={migrating || isObserver}
-              onPress={() => isObserver ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs') : launchMigration(false)}
+              onPress={() =>
+                isObserver
+                  ? Alert.alert('Lecture seule', 'Action non autorisée pour les observateurs')
+                  : launchMigration(false)
+              }
             >
               <Text style={styles.migrationButtonPrimaryText}>Exécuter</Text>
             </TouchableOpacity>
@@ -468,7 +507,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 2.22,
   },
-  // Sessions cible (styles séparés)
   sessionsContainer: {
     backgroundColor: 'white',
     marginHorizontal: 20,

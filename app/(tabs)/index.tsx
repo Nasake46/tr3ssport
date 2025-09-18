@@ -1,141 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { Button, StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+// app/index.tsx
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { Redirect } from 'expo-router';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, firestore } from '@/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
-export default function HomeScreen() {
-  const router = useRouter();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function Index() {
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
-      if (user) {
-        // Utilisateur connecté, récupérer son rôle
-        try {
-          const userDoc = await getDoc(doc(firestore, "users", user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUserRole(userData.role);
-          } else {
-            setUserRole("Rôle inconnu");
-          }
-        } catch (error) {
-          console.error("Erreur lors de la récupération du rôle:", error);
-          setUserRole("Erreur");
-        }
-      } else {
-        // Utilisateur déconnecté
-        setUserRole(null);
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!u) {
+        setUser(null);
+        setRole(null);
+        setReady(true);
+        return;
       }
-      setLoading(false);
+      setUser(u);
+      try {
+        const snap = await getDoc(doc(firestore, 'users', u.uid));
+        const r = snap.exists() ? (snap.data() as any).role : null;
+        setRole(r ?? 'user');
+      } catch {
+        setRole('user');
+      } finally {
+        setReady(true);
+      }
     });
-
-    // Nettoyer l'abonnement à la déconnexion
-    return () => unsubscribe();
+    return unsub;
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUserRole(null);
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
-    }
-  };
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
 
-  // Fonction pour rediriger vers la page d'accueil appropriée en fonction du rôle
-  const navigateToHome = () => {
-    if (userRole === 'coach') {
-      router.push('/(tabs)/homeCoach');
-    } else {
-      router.push('/(tabs)/HomeScreen');
-    }
-  };
+  // Non connecté -> login
+  if (!user) return <Redirect href="/auth/LoginScreen" />;
 
-  return (
-    <View style={styles.container}>
-      {loading ? (
-        <Text>Chargement...</Text>
-      ) : userRole ? (
-        <>
-          <Text style={styles.welcomeText}>Bienvenue !</Text>
-          <Text style={styles.roleText}>Votre rôle : {userRole}</Text>
-          
-          
-          <Button title="Accéder à mon espace" onPress={navigateToHome} />
-          <Button title="Se déconnecter" onPress={handleLogout} />
-        </>
-      ) : (
-        <>
-          <View style={styles.buttonContainer}>
-            <Text style={styles.sectionTitle}>Espace Utilisateur</Text>
-            <Button title="Se connecter" onPress={() => router.push('/(tabs)/LoginScreen')} />
-            <Button title="S'inscrire" onPress={() => router.push('/(tabs)/registerScreen')} />
-          </View>
-          
-          <View style={styles.buttonContainer}>
-            <Text style={styles.sectionTitle}>Espace Coach</Text>
-            <Button 
-              title="Inscription Coach" 
-              onPress={() => router.push('/(tabs)/registerCoachScreen')} 
-            />
-          </View>
-        </>
-      )}
-    </View>
-  );
+  // Coach (ou admin) -> homeCoach
+  if (role === 'coach' || role === 'admin') return <Redirect href="/homeCoach" />;
+
+  // User -> HomeScreen
+  return <Redirect href="/HomeScreen" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 24,
-    padding: 16,
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  roleText: {
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  clientMenu: {
-    width: '100%',
-    gap: 12,
-    marginBottom: 20,
-  },
-  menuButton: {
-    backgroundColor: '#7667ac',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  groupMenuButton: {
-    backgroundColor: '#4CAF50', // Couleur différente pour les rendez-vous de groupe
-  },
-  menuButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});

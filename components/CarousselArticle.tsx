@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   item: {
-    backgroundColor: '#EAE7F5',
+    backgroundColor: 'rgba(4, 64, 58, 0.15)',
     borderRadius: 10,
     width: width - 40,
     padding: 40,
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   dot: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#D6D3E7',
+    backgroundColor: 'rgba(4, 64, 58, 0.15)',
     marginHorizontal: 4,
   },
 });

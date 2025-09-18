@@ -1,267 +1,260 @@
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import CarouselArticles from '../../components/CarousselArticle';
-import FloatingActionButton from '../../components/appointments/FloatingActionButton';
+import CarousselHealthArticle from '../../components/CarousselHealtArticle';
+import CarouselCoachs from '../../components/CarousselCoachs';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, firestore } from '@/firebase';
+import { useRouter } from 'expo-router';
 
+const COLORS = {
+  bg: '#FFFFFF',
+  text: '#0F473C',
+  sub: '#3D6B60',
+  primary: '#0E6B5A',
+  line: '#E5E7EB',
+  chip: '#F4AF00',
+  card: '#F2F4F5',
+};
 
 const HomeScreen = () => {
-  const navigation = useNavigation();
   const router = useRouter();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [designatedCoachId, setDesignatedCoachId] = useState<string | null>(null);
 
-  
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(firestore, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data: any = docSnap.data();
+          setFirstName(data.firstName || '');
+          setLastName(data.lastName || '');
+          setDesignatedCoachId(data.designatedCoachId || null);
+        }
+      } else {
+        setDesignatedCoachId(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   return (
-    <View style={{ flex: 1 }}>
-      <SafeAreaView>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-      {/* Header */}
-      <View className='header' style={styles.div_header}>
-        <Text style={styles.text_h1}>Mon tableau de bord</Text>
-        <TouchableOpacity>
-          <View className="profil">
-            <Ionicons name="person" size={24} color="#333" />
-            <Text style={styles.text_base}>Nathalie Marina</Text>
-          </View>
-        </TouchableOpacity>
-      </View>      {/* Top buttons */}
-      <View className='top_buttons' style={styles.div_head_button}>
-        <TouchableOpacity>
-          <View style={styles.top_buttons}>
-            <Image source={require('../../assets/images/MyCoach.png')}/>
-            <Text style={styles.text_base}>Mon Coach</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity>
-          <View style={styles.top_buttons}>
-            <Image source={require('../../assets/images/Programm.png')}/>
-            <Text style={styles.text_base}>Programme</Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity>
-          <View style={styles.top_buttons}>
-            <Ionicons name="fitness" size={40} color="#5D5A88" />
-            <Text style={styles.text_base}>Entraînement</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Sessions */}
-      <View className="sessions" style={styles.sessions}>
-          <View>
-            <Text style={styles.text_h1}>Séances</Text>
-            <Text style={styles.text_base}>Découvrez vos programmes d'entraînement.</Text>
-          </View>
-          <TouchableOpacity style={styles.button} onPress={() => Alert.alert('Programmes disponibles')}>
-            <Text style={styles.text_base}>Consulter</Text>
-          </TouchableOpacity>
-      </View>
-      <TouchableOpacity style={styles.big_session} onPress={() => Alert.alert('Programmes disponibles')}>
-        <Text style={styles.text_h1}>Programmes à venir</Text>
-        <Text>Consultez vos programmes d'entraînement personnalisés</Text>
-      </TouchableOpacity>
-
-      {/* Rendez-vous Section */}
-      <View className="appointments_section" style={styles.appointmentsSection}>
-        <Text style={styles.text_h1}>Mes Rendez-vous</Text>
-        <Text style={styles.text_base}>Gérez vos séances avec vos coaches</Text>
-        
-        <View style={styles.appointmentButtons}>
-          <TouchableOpacity 
-            style={styles.appointmentButton} 
-            onPress={() => router.push('/appointments/create')}
-          >
-            <Ionicons name="add-circle" size={24} color="#007AFF" />
-            <Text style={styles.appointmentButtonText}>Nouveau RDV</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.appointmentButton} 
-            onPress={() => router.push('/appointments/client-dashboard')}
-          >
-            <Ionicons name="calendar" size={24} color="#007AFF" />
-            <Text style={styles.appointmentButtonText}>Mes RDV</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.appointmentButton} 
-            onPress={() => router.push('/invitations')}
-          >
-            <Ionicons name="mail" size={24} color="#007AFF" />
-            <Text style={styles.appointmentButtonText}>Invitations</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.appointmentButton} 
-            onPress={() => router.push('/calendar')}
-          >
-            <Ionicons name="calendar-outline" size={24} color="#007AFF" />
-            <Text style={styles.appointmentButtonText}>Calendrier</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Header */}
+        <View className='header' style={styles.div_header}>
+          <Text style={styles.text_h1}>Mon tableau de bord</Text>
+          <TouchableOpacity onPress={() => router.push('/ProfileScreen')}>
+            <View className="profil" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="person" size={24} color={COLORS.text} />
+              <Text style={styles.text_base}>{firstName} {lastName}</Text>
+            </View>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Other links */}
-      <View className="other_links" style={styles.other_links}>
-        <TouchableOpacity onPress={() => Alert.alert('Programme pressed')}>
-          <View style={styles.programm}>
-            <View style={styles.programmLogo}>
-              <Image source={require('../../assets/images/Programme2.png')}></Image>
+        {/* Top buttons */}
+        <View className='top_buttons' style={styles.div_head_button}>
+          <TouchableOpacity
+            onPress={() => {
+              if (designatedCoachId) {
+                router.push({ pathname: '/coachScreen', params: { coachId: designatedCoachId } });
+              } else {
+                router.push('/coachScreen');
+              }
+            }}
+          >
+            <View style={styles.top_buttons}>
+              <Image source={require('../../assets/images/MyCoach.png')} style={{ width: 40, height: 40 }} />
+              <Text style={styles.text_base}>Mon Coach</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('../calendar')}>
+            <View style={styles.top_buttons}>
+              <Image source={require('../../assets/images/Programm.png')} style={{ width: 40, height: 40 }}/>
               <Text style={styles.text_base}>Programme</Text>
             </View>
-            <Text>Sur mesure</Text>
-          </View>
-        </TouchableOpacity>
-        <View style={styles.line}></View>
-        <TouchableOpacity onPress={() => Alert.alert('Follow pressed')}>
-          <View style={styles.programmLogo}>
-            <Image source={require('../../assets/images/follow.png')}></Image>
-            <Text style={styles.text_base}>Suivi et Progrès</Text>
-          </View>
-        </TouchableOpacity>
-        <View style={styles.line}></View>
-        <TouchableOpacity onPress={() => Alert.alert('Dossier pressed')}>
-          <View style={styles.programmLogo}>
-            <Image source={require('../../assets/images/healthFolder.png')}></Image>
-            <Text style={styles.text_base}>Mon dossier de bilan</Text>
-          </View>
-        </TouchableOpacity>
-        <View style={styles.line}></View>
-        <TouchableOpacity onPress={() => Alert.alert('Partenaires pressed')}>
-        <View style={styles.programmLogo}>
-            <Image source={require('../../assets/images/healthPartner.png')}></Image>
-            <Text style={styles.text_base}>Partenaires de santé</Text>
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <View style={styles.top_buttons}>
+              <Image source={require('../../assets/images/follow.png')} style={{ width: 40, height: 40 }}/>
+              <Text style={styles.text_base}>Suivi</Text>
+            </View>
+          </TouchableOpacity>
+          
         </View>
-        </TouchableOpacity>
-        <View style={styles.line}></View>
-      </View>      {/* Health article */}
-      <CarouselArticles />
+<TouchableOpacity onPress={() => router.push('/messaging')}>
+  <View style={styles.messageBar}>
+    <Ionicons name="chatbubbles-outline" size={20} color="#fff" />
+    <Text style={styles.messageBarText}>Messages</Text>
+  </View>
+</TouchableOpacity>
+        {/* Sessions */}
+        <View className="sessions" style={styles.sessions}>
+          <View>
+            <Text style={styles.text_h1}>Mes Séances</Text>
+            <Text style={styles.text_base}>Consultez vos séances à venir.</Text>
+          </View>
+          <TouchableOpacity style={styles.button} onPress={() => router.push('/appointments/client-dashboard')}>
+            <Text style={styles.buttonText}>Consulter</Text>
+          </TouchableOpacity>
+        </View>
 
+        {/* Upcoming Sessions */}
+        <TouchableOpacity style={styles.big_session} onPress={() => router.push('../invitations')}>
+          <Text style={styles.text_h1}>Séances à venir</Text>
+          <Text style={styles.paragraph}>Les invitations que vous avez reçues</Text>
+          <View style={styles.chips}>
+            <View style={styles.chip}><Text style={styles.chipTxt}>Renforcement</Text></View>
+            <View style={styles.chip}><Text style={styles.chipTxt}>Cardio</Text></View>
+            <View style={styles.chip}><Text style={styles.chipTxt}>Souplesse</Text></View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Other links */}
+        <View className="other_links" style={styles.other_links}>
+          <TouchableOpacity onPress={() => router.push('/subscriptions')}>
+            <View style={styles.programmLogo}>
+              <Image source={require('../../assets/images/Programme2.png')} style={{ width: 40, height: 40 }} />
+              <Text style={styles.text_base}>Abonnements</Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.line} />
+
+          <TouchableOpacity onPress={() => Alert.alert('Follow pressed')}>
+            <View style={styles.programmLogo}>
+              <Image source={require('../../assets/images/follow.png')} style={{ width: 40, height: 40 }} />
+              <Text style={styles.text_base}>Suivi et Progrès</Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.line} />
+
+          <TouchableOpacity onPress={() => router.push('/account/BilanScreen')}>
+            <View style={styles.programmLogo}>
+              <Image source={require('../../assets/images/healthFolder.png')} style={{ width: 40, height: 40 }} />
+              <Text style={styles.text_base}>Mon dossier de bilan</Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.line} />
+
+          <TouchableOpacity onPress={() => Alert.alert('Partenaires pressed')}>
+            <View style={styles.programmLogo}>
+              <Image source={require('../../assets/images/healthPartner.png')} style={{ width: 40, height: 40 }} />
+              <Text style={styles.text_base}>Partenaires de santé</Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.line} />
+        </View>
+
+        {/* Carrousels */}
+        {/* <CarouselArticles /> */}
+        {/* <CarousselHealthArticle /> */}
+        <View style={styles.line} />
+        <CarouselCoachs />
       </ScrollView>
-      </SafeAreaView>
-      
-      {/* Bouton flottant pour créer un RDV */}
-      <FloatingActionButton />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  text_h1: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#5D5A88',
-  },
-  text_base: {
-    color: '#5D5A88',
-  },
+  // header
   div_header: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 20,
-    padding: "3%",
   },
+  text_h1: { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  text_base: { fontSize: 14, color: COLORS.sub },
+
+  // top shortcuts
   div_head_button: {
+    paddingHorizontal: 20,
+    marginTop: 6,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: "3%",
-    marginBottom: "3%",
   },
   top_buttons: {
-    borderWidth: 1,
-    borderRadius: 10,
-    width: 120,
-    height: 100,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.card,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 16,
   },
+
+  // sessions block
   sessions: {
+    marginTop: 22,
+    paddingHorizontal: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: "3%",
+    alignItems: 'center',
+    gap: 12,
   },
   button: {
-    borderWidth: 1,
-    borderRadius: 10,
-    width: 70,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 22,
   },
+  buttonText: { color: '#fff', fontWeight: '700' },
+
+  messageBar: {
+  marginTop: 12,
+  marginHorizontal: 20,
+  backgroundColor: COLORS.primary,
+  borderRadius: 22,
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  elevation: 2,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.08,
+  shadowRadius: 2,
+},
+messageBarText: { color: '#fff', fontWeight: '700' },
+
   big_session: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     borderWidth: 1,
-    borderRadius: 10,
-    width: '90%',
-    height: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginTop: 20,
+    borderColor: COLORS.line,
+    padding: 16,
+    gap: 8,
   },
-  other_links: {
-    padding: '2%',
-    marginTop: 10,
-  },
-  programm : {
+  paragraph: { color: COLORS.sub },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  chip: { backgroundColor: COLORS.chip, borderRadius: 22, paddingVertical: 6, paddingHorizontal: 12 },
+  chipTxt: { color: '#2B2B2B', fontWeight: '700' },
+
+  // links
+  other_links: { marginTop: 8, paddingHorizontal: 20 },
+  programm: {
+    paddingVertical: 14,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginRight: 10,
-    width: '90%',
   },
-  programmLogo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 10,
-    marginTop: 10,
-  },
-  line: {
-    width: '90%',
-    height: 1,
-    backgroundColor: '#D4D2E3',
-    marginTop: 10,
-    alignSelf: 'center',
-  },
-  appointmentsSection: {
-    padding: 20,
-    backgroundColor: 'white',
-    margin: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  appointmentButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 15,
-  },
-  appointmentButton: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginHorizontal: 3,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  appointmentButtonText: {
-    color: '#007AFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginTop: 5,
-    textAlign: 'center',
-  },
+  programmLogo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  linkSub: { color: COLORS.sub },
+  line: { height: 1, backgroundColor: COLORS.line, marginHorizontal: 0, opacity: 0.9 },
 });
 
 export default HomeScreen;

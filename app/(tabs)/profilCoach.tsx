@@ -1,27 +1,26 @@
+// profilCoach.tsx
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
-import { Collapsible } from '@/components/Collapsible';
+import { ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator, TextInput, Alert, Text } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { auth, firestore } from '@/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { ProfileHeader } from '@/components/ProfileHeader';
-import { InfoItem } from '@/components/InfoItem';
-import { SectionTitle } from '@/components/SectionTitle';
-import { TagManager } from '@/components/TagManager';
-import { CoachTag } from '@/models/tag';
 import { Ionicons } from '@expo/vector-icons';
+
+const COLORS = {
+  oxford: '#121631',   // bleu foncé
+  line:   '#E5E7EB',   // séparateurs
+  textSub:'#667085',
+  white:  '#FFFFFF',
+};
 
 export default function ProfileCoachScreen() {
   const router = useRouter();
-  const [coachData, setCoachData] = useState<any>(null);
+  const { edit } = useLocalSearchParams<{ edit?: string }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [tags, setTags] = useState<CoachTag[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [isEditing, setIsEditing] = useState(edit === '1');
+
+  const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     phoneNumber: '',
@@ -29,485 +28,348 @@ export default function ProfileCoachScreen() {
     companyName: '',
     siretNumber: '',
     diploma: '',
-    bio: ''
+    bio: '',
+    profileImageUrl: '',
+    pricePerHour: '',
+    seniorityYears: '',
+    specialtiesText: '',
+    serviceAreasText: '',
+    videoUrl: '',
+    locationLat: '',
+    locationLng: '',
   });
 
   useEffect(() => {
-    const fetchCoachData = async () => {
+    const run = async () => {
       try {
         const user = auth.currentUser;
         if (!user) {
           router.replace('/(tabs)');
           return;
         }
-
-        const userDoc = await getDoc(doc(firestore, "users", user.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          if (userData.role !== 'coach') {
-            router.replace('/(tabs)');
-            return;
-          }
-          setCoachData(userData);
-          // Initialiser le formulaire avec les données existantes
-          setFormData({
-            firstName: userData.firstName || '',
-            lastName: userData.lastName || '',
-            phoneNumber: userData.phoneNumber || '',
-            address: userData.address || '',
-            companyName: userData.companyName || '',
-            siretNumber: userData.siretNumber || '',
-            diploma: userData.diploma || '',
-            bio: userData.bio || ''
+        const ref = doc(firestore, 'users', user.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const d: any = snap.data();
+          setForm({
+            firstName: d.firstName || '',
+            lastName: d.lastName || '',
+            phoneNumber: d.phoneNumber || '',
+            address: d.address || '',
+            companyName: d.companyName || '',
+            siretNumber: d.siretNumber || '',
+            diploma: d.diploma || '',
+            bio: d.bio || '',
+            profileImageUrl: d.profileImageUrl || '',
+            pricePerHour: d.pricePerHour?.toString?.() || '',
+            seniorityYears: d.seniorityYears?.toString?.() || '',
+            specialtiesText: Array.isArray(d.specialties) ? d.specialties.join(', ') : '',
+            serviceAreasText: Array.isArray(d.serviceAreas) ? d.serviceAreas.join(', ') : '',
+            videoUrl: d.videoUrl || '',
+            locationLat: d.location?.lat?.toString?.() || '',
+            locationLng: d.location?.lng?.toString?.() || '',
           });
-        } else {
-          router.replace('/(tabs)');
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des données:", error);
+      } catch (e) {
+        Alert.alert('Erreur', "Impossible de charger votre profil");
       } finally {
         setLoading(false);
       }
     };
+    run();
+  }, []);
 
-    fetchCoachData();
-  }, [router]);
-
-  const handleEditPress = () => {
-    setIsEditing(true);
+  const toNumber = (v: string) => {
+    const n = parseFloat((v || '').replace(',', '.'));
+    return Number.isFinite(n) ? n : undefined;
   };
+  const toArray = (v: string) => (v || '').split(',').map(s => s.trim()).filter(Boolean);
 
-  const handleSave = async () => {
+  const save = async () => {
     try {
       setSaving(true);
       const user = auth.currentUser;
       if (!user) {
-        Alert.alert("Erreur", "Utilisateur non connecté");
+        Alert.alert('Erreur', 'Utilisateur non connecté');
         return;
       }
-
-      // Validation des données
-      if (!formData.firstName || !formData.lastName) {
-        Alert.alert("Erreur", "Le nom et le prénom sont obligatoires");
-        setSaving(false);
-        return;
-      }
-
-      // Mettre à jour les données dans Firestore
-      await updateDoc(doc(firestore, "users", user.uid), {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phoneNumber: formData.phoneNumber,
-        address: formData.address,
-        companyName: formData.companyName,
-        siretNumber: formData.siretNumber,
-        diploma: formData.diploma,
-        bio: formData.bio,
-        updatedAt: new Date()
+      await updateDoc(doc(firestore, 'users', user.uid), {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phoneNumber: form.phoneNumber,
+        address: form.address,
+        companyName: form.companyName,
+        siretNumber: form.siretNumber,
+        diploma: form.diploma,
+        bio: form.bio,
+        profileImageUrl: form.profileImageUrl || null,
+        pricePerHour: toNumber(form.pricePerHour),
+        seniorityYears: toNumber(form.seniorityYears),
+        specialties: toArray(form.specialtiesText),
+        serviceAreas: toArray(form.serviceAreasText),
+        videoUrl: form.videoUrl || null,
+        location:
+          toNumber(form.locationLat) !== undefined && toNumber(form.locationLng) !== undefined
+            ? { lat: toNumber(form.locationLat)!, lng: toNumber(form.locationLng)! }
+            : null,
+        updatedAt: new Date(),
       });
-
-      // Mettre à jour les données affichées
-      setCoachData({
-        ...coachData,
-        ...formData
-      });
-
       setIsEditing(false);
-      Alert.alert("Succès", "Votre profil a été mis à jour avec succès");
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du profil:", error);
-      Alert.alert("Erreur", "Impossible de mettre à jour votre profil");
+      Alert.alert('Succès', 'Profil mis à jour');
+    } catch (e) {
+      Alert.alert('Erreur', "Impossible d'enregistrer");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCancel = () => {
-    // Réinitialiser le formulaire avec les données existantes
-    setFormData({
-      firstName: coachData.firstName || '',
-      lastName: coachData.lastName || '',
-      phoneNumber: coachData.phoneNumber || '',
-      address: coachData.address || '',
-      companyName: coachData.companyName || '',
-      siretNumber: coachData.siretNumber || '',
-      diploma: coachData.diploma || '',
-      bio: coachData.bio || ''
-    });
-    setIsEditing(false);
-  };
-
-  // Exemple de compétences (à remplacer par les données réelles)
-  const skills = [
-    "Remise en forme", "Nutrition", "Perte de poids", 
-    "Musculation", "Réhabilitation", "Coaching sportif"
-  ];
-
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7667ac" />
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.scrollView}>
-      <ThemedView style={styles.container}>
-        {/* En-tête du profil */}
-        <ProfileHeader 
-          name={`${formData.firstName || ''} ${formData.lastName || ''}`}
-          specialty={formData.diploma || 'Coach sportif'}
-          onEditPress={isEditing ? undefined : handleEditPress}
-        />
+    <ScrollView style={styles.scroll}>
+      <View style={styles.container}>
+        {/* Titre */}
+        <View style={styles.headerRow}>
+  <TouchableOpacity
+    style={styles.backBtn}
+    onPress={() => (router.replace('/homeCoach'))}
+  >
+    <Ionicons name="chevron-back" size={20} color={COLORS.oxford} />
+  </TouchableOpacity>
 
-        {/* Informations de contact */}
+  <Text style={styles.h1}>Mon profil coach</Text>
+
+  {/* espaceur pour équilibrer la ligne */}
+  <View style={{ width: 36 }} />
+</View>
+
+
+        {/* Actions sous le titre */}
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.secondary} onPress={() => setIsEditing(e => !e)}>
+            <Ionicons name={isEditing ? 'eye' : 'create'} size={18} color={COLORS.oxford} />
+            <Text style={styles.secondaryTxt}>{isEditing ? 'Prévisualiser' : 'Modifier'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.primary, { opacity: isEditing ? 1 : 0.6 }]}
+            disabled={!isEditing || saving}
+            onPress={save}
+          >
+            <Text style={styles.primaryTxt}>{saving ? 'Enregistrement...' : 'Enregistrer'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Infos personnelles */}
         <View style={styles.section}>
-          <SectionTitle title="Informations de contact" />
-          
+          <Text style={styles.h2}>Informations personnelles</Text>
           {isEditing ? (
             <>
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Prénom</ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={formData.firstName}
-                  onChangeText={(text) => setFormData({...formData, firstName: text})}
-                  placeholder="Votre prénom"
-                />
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Nom</ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={formData.lastName}
-                  onChangeText={(text) => setFormData({...formData, lastName: text})}
-                  placeholder="Votre nom"
-                />
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Email</ThemedText>
-                <ThemedText style={styles.disabledText}>{coachData?.email || 'Non renseigné'}</ThemedText>
-                <ThemedText style={styles.helperText}>L'email ne peut pas être modifié</ThemedText>
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Téléphone</ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={formData.phoneNumber}
-                  onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
-                  placeholder="Votre numéro de téléphone"
-                  keyboardType="phone-pad"
-                />
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Adresse</ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={formData.address}
-                  onChangeText={(text) => setFormData({...formData, address: text})}
-                  placeholder="Votre adresse"
-                />
-              </View>
+              <Field label="Prénom" value={form.firstName} onChange={v => setForm({ ...form, firstName: v })} />
+              <Field label="Nom" value={form.lastName} onChange={v => setForm({ ...form, lastName: v })} />
+              <Field label="Téléphone" value={form.phoneNumber} onChange={v => setForm({ ...form, phoneNumber: v })} />
+              <Field label="Adresse" value={form.address} onChange={v => setForm({ ...form, address: v })} />
             </>
           ) : (
             <>
-              <InfoItem 
-                icon="mail" 
-                label="Email" 
-                value={coachData?.email || 'Non renseigné'} 
-              />
-              
-              <InfoItem 
-                icon="call" 
-                label="Téléphone" 
-                value={coachData?.phoneNumber || 'Non renseigné'} 
-              />
-              
-              <InfoItem 
-                icon="location" 
-                label="Adresse" 
-                value={coachData?.address || 'Non renseignée'} 
-              />
+              <Row label="Nom" value={`${form.firstName} ${form.lastName}`.trim() || '—'} />
+              <Row label="Téléphone" value={form.phoneNumber || '—'} />
+              <Row label="Adresse" value={form.address || '—'} />
             </>
           )}
         </View>
 
-        {/* Informations professionnelles */}
+        {/* Infos pro */}
         <View style={styles.section}>
-          <SectionTitle title="Informations professionnelles" />
-          
+          <Text style={styles.h2}>Informations professionnelles</Text>
           {isEditing ? (
             <>
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Nom de la société</ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={formData.companyName}
-                  onChangeText={(text) => setFormData({...formData, companyName: text})}
-                  placeholder="Nom de votre société"
-                />
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Numéro SIRET</ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={formData.siretNumber}
-                  onChangeText={(text) => setFormData({...formData, siretNumber: text})}
-                  placeholder="Votre numéro SIRET"
-                  keyboardType="number-pad"
-                />
-              </View>
-              
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.label}>Diplôme</ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={formData.diploma}
-                  onChangeText={(text) => setFormData({...formData, diploma: text})}
-                  placeholder="Vos diplômes"
-                />
-              </View>
+              <Field label="Entreprise" value={form.companyName} onChange={v => setForm({ ...form, companyName: v })} />
+              <Field label="SIRET" value={form.siretNumber} onChange={v => setForm({ ...form, siretNumber: v })} />
+              <Field label="Diplôme" value={form.diploma} onChange={v => setForm({ ...form, diploma: v })} />
             </>
           ) : (
             <>
-              <InfoItem 
-                icon="business" 
-                label="Entreprise" 
-                value={coachData?.companyName || 'Non renseignée'} 
-              />
-              
-              <InfoItem 
-                icon="document-text" 
-                label="SIRET" 
-                value={coachData?.siretNumber || 'Non renseigné'} 
-              />
-              
-              <InfoItem 
-                icon="school" 
-                label="Diplôme" 
-                value={coachData?.diploma || 'Non renseigné'} 
-              />
+              <Row label="Entreprise" value={form.companyName || '—'} />
+              <Row label="SIRET" value={form.siretNumber || '—'} />
+              <Row label="Diplôme" value={form.diploma || '—'} />
             </>
           )}
         </View>
 
-        {/* Bio et description */}
+        {/* Bio */}
         <View style={styles.section}>
-          <SectionTitle title="À propos de moi" />
-          
+          <Text style={styles.h2}>À propos de moi</Text>
           {isEditing ? (
             <TextInput
               style={[styles.input, styles.textArea]}
-              value={formData.bio}
-              onChangeText={(text) => setFormData({...formData, bio: text})}
-              placeholder="Présentez-vous à vos clients"
+              value={form.bio}
+              onChangeText={v => setForm({ ...form, bio: v })}
+              placeholder="Présentez-vous..."
               multiline
-              numberOfLines={4}
             />
           ) : (
-            <ThemedText style={styles.bio}>
-              {coachData?.bio || 
-                "Aucune biographie n'a été ajoutée. Complétez votre profil pour vous présenter à vos clients potentiels."}
-            </ThemedText>
+            <Text style={styles.p}>{form.bio || '—'}</Text>
           )}
-        </View>        {/* Tags et spécialités */}
-        <View style={styles.section}>
-          <TagManager 
-            coachId={auth.currentUser?.uid || ''} 
-            editable={isEditing}
-            onTagsChange={(tags) => {
-              console.log('Tags mis à jour:', tags);
-            }}
-          />
         </View>
 
-        {/* Tarifs et prestations */}
-        <Collapsible title="Tarifs et prestations">
-          <ThemedText style={styles.emptyState}>
-            Aucun tarif n'a été configuré. Ajoutez vos prestations pour que vos clients puissent les consulter.
-          </ThemedText>
-        </Collapsible>
+        {/* Page coach (public) */}
+        <View style={styles.section}>
+          <Text style={styles.h2}>Page coach (public)</Text>
 
-        {/* Disponibilités */}
-        <Collapsible title="Disponibilités">
-          <ThemedText style={styles.emptyState}>
-            Aucune disponibilité n'a été configurée. Configurez votre calendrier pour que vos clients puissent prendre rendez-vous.
-          </ThemedText>
-        </Collapsible>
-
-        {/* Boutons d'action */}
-        {isEditing ? (
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={handleCancel}
-              disabled={saving}
-            >
-              <ThemedText style={styles.cancelButtonText}>Annuler</ThemedText>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <ThemedText style={styles.actionButtonText}>Enregistrer</ThemedText>
-              )}
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={styles.secondaryButton}
-              onPress={() => router.push('/coachDashboard')}
-            >
-              <Ionicons name="calendar" size={20} color="#7667ac" />
-              <ThemedText style={styles.secondaryButtonText}>Demandes de RDV</ThemedText>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleEditPress}
-            >
-              <ThemedText style={styles.actionButtonText}>Modifier mon profil</ThemedText>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ThemedView>
+          {isEditing ? (
+            <>
+              <Field label="Photo (URL)" value={form.profileImageUrl} onChange={v => setForm({ ...form, profileImageUrl: v })} />
+              <Field label="Tarif €/h" value={form.pricePerHour} onChange={v => setForm({ ...form, pricePerHour: v })} keyboardType="decimal-pad" />
+              <Field label="Ancienneté (années)" value={form.seniorityYears} onChange={v => setForm({ ...form, seniorityYears: v })} keyboardType="number-pad" />
+              <Field label="Spécialités (séparées par des virgules)" value={form.specialtiesText} onChange={v => setForm({ ...form, specialtiesText: v })} />
+              <Field label="Zones d’intervention (séparées par des virgules)" value={form.serviceAreasText} onChange={v => setForm({ ...form, serviceAreasText: v })} />
+              <Field label="Vidéo (YouTube)" value={form.videoUrl} onChange={v => setForm({ ...form, videoUrl: v })} />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Field label="Latitude" value={form.locationLat} onChange={v => setForm({ ...form, locationLat: v })} keyboardType="decimal-pad" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Field label="Longitude" value={form.locationLng} onChange={v => setForm({ ...form, locationLng: v })} keyboardType="decimal-pad" />
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.secondary, { marginTop: 8, alignSelf: 'flex-start' }]}
+                onPress={() => router.push({ pathname: '/coachScreen', params: { coachId: auth.currentUser?.uid || '' } })}
+              >
+                <Ionicons name="eye" size={18} color={COLORS.oxford} />
+                <Text style={styles.secondaryTxt}>Prévisualiser ma page coach</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Row label="Tarif" value={form.pricePerHour ? `${form.pricePerHour} €/h` : '—'} />
+              <Row label="Ancienneté" value={form.seniorityYears ? `${form.seniorityYears} ans` : '—'} />
+              <Row label="Spécialités" value={form.specialtiesText || '—'} />
+              <Row label="Zones" value={form.serviceAreasText || '—'} />
+              <TouchableOpacity
+                style={[styles.secondary, { marginTop: 8, alignSelf: 'flex-start' }]}
+                onPress={() => router.push({ pathname: '/coachScreen', params: { coachId: auth.currentUser?.uid || '' } })}
+              >
+                <Ionicons name="eye" size={18} color={COLORS.oxford} />
+                <Text style={styles.secondaryTxt}>Voir ma page coach</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
     </ScrollView>
   );
 }
 
+function Field({
+  label,
+  value,
+  onChange,
+  keyboardType,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  keyboardType?: 'default' | 'number-pad' | 'decimal-pad' | 'email-address' | 'phone-pad';
+}) {
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 6 }}>{label}</Text>
+      <TextInput style={styles.input} value={value} onChangeText={onChange} keyboardType={keyboardType} placeholder="" />
+    </View>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+      <Text style={{ color: COLORS.textSub }}>{label}</Text>
+      <Text style={{ color: '#101828', fontWeight: '600' }}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-    backgroundColor: "#F5F5F8",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  section: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  bio: {
-    lineHeight: 22,
-    fontSize: 15,
-  },
-  skillsContainer: {
+  scroll: { backgroundColor: COLORS.white },
+  container: { flex: 1, padding: 16 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  h1: { fontSize: 22, fontWeight: '700', color: COLORS.oxford },
+
+  // Actions sous le titre (alignées et clean)
+  headerActions: {
     flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 12,
     flexWrap: 'wrap',
   },
-  emptyState: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: '#666',
-    marginVertical: 8,
-  },
-  actionButton: {
-    backgroundColor: '#7667ac',
-    borderRadius: 10,
-    padding: 16,
+
+  primary: {
+    backgroundColor: COLORS.oxford,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    marginVertical: 16,
-    flex: 1,
-    marginLeft: 8,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    marginBottom: 6,
-    color: '#666',
-  },
-  input: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#E1E1E8',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  disabledText: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#888',
-    backgroundColor: '#F0F0F5',
-    borderRadius: 8,
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 4,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  cancelButton: {
-    backgroundColor: '#F0F0F5',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginVertical: 16,
-    flex: 1,
-    marginRight: 8,
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  secondaryButton: {
-    backgroundColor: '#F0F0F5',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginVertical: 16,
-    flex: 1,
-    marginRight: 8,
-    flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
   },
-  secondaryButtonText: {
-    color: '#7667ac',
-    fontWeight: 'bold',
-    fontSize: 16,
+  primaryTxt: { color: '#fff', fontWeight: '700' },
+
+  secondary: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.oxford,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
+  secondaryTxt: { color: COLORS.oxford, fontWeight: '700' },
+
+  section: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  backBtn: {
+  width: 36,
+  height: 36,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: COLORS.white,
+},
+
+  h2: { fontSize: 16, fontWeight: '700', color: COLORS.oxford, marginBottom: 10 },
+
+  input: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#101828',
+  },
+  textArea: { minHeight: 100, textAlignVertical: 'top' },
+
+  p: { color: '#475467' },
 });
