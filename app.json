@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.nasakeorg.tr3ssport",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "L'application a besoin d'accéder à la caméra pour scanner les QR codes de présence."
       }
     },
     "android": {
@@ -22,7 +23,6 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "android.permission.CAMERA",
         "android.permission.CAMERA"
       ],
       "package": "com.nasakeorg.tr3ssport"
