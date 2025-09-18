@@ -3,7 +3,15 @@
   "build": {
     "preview": {
       "android": { "buildType": "apk" },
+      "ios": { "simulator": true },
       "distribution": "internal"
+    },
+    "production": {
+      "ios": {},
+      "android": {}
     }
+  },
+  "submit": {
+    "production": {}
   }
 }

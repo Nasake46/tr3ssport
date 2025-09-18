@@ -74,32 +74,26 @@ export default function QRCodeScannerOptimized({
 
   const { sessionTime, totalSeconds } = useSessionTimer(activeSession);
 
-  const getCameraPermissions = useCallback(async () => {
+  // Plus besoin de fonction custom: on utilise le hook useCameraPermissions
+  const requestCam = useCallback(async () => {
     try {
-      console.log('📷 CAMÉRA - Demande de permissions...');
-      let status: string | undefined;
-      if (isWeb) {
-        const result = await Camera.requestCameraPermissionsAsync();
-        status = result.status;
-      } else {
-        const result = await BarCodeScanner.requestPermissionsAsync();
-        status = result.status;
+      if (!permission) {
+        const res = await requestPermission();
+        console.log('📷 CAMÉRA - Permission demandée (init). Statut:', res?.status);
+      } else if (!permission.granted) {
+        const res = await requestPermission();
+        console.log('📷 CAMÉRA - Permission redemandée. Statut:', res?.status);
       }
-      console.log('📷 CAMÉRA - Statut permission:', status);
-      setHasPermission(status === 'granted');
-      if (status === 'granted') {
-        console.log('✅ CAMÉRA - Permissions accordées');
+      if (permission?.granted) {
         setCameraError(null);
-      } else {
-        console.log('❌ CAMÉRA - Permissions refusées');
+      } else if (permission && !permission.granted) {
         setCameraError('Permissions caméra refusées');
       }
-    } catch (error) {
-      console.error('❌ CAMÉRA - Erreur permissions:', error);
-      setHasPermission(false);
-      setCameraError(`Erreur permissions: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } catch (e) {
+      console.error('❌ CAMÉRA - Erreur permissions (hook):', e);
+      setCameraError(`Erreur permissions: ${e instanceof Error ? e.message : 'Erreur inconnue'}`);
     }
-  }, [isWeb]);
+  }, [permission, requestPermission]);
 
 
   const checkCameraAvailability = useCallback(async () => {
@@ -157,11 +151,11 @@ export default function QRCodeScannerOptimized({
     // encapsuler fonctions dans effet pour éviter warnings dépendances
     const init = async () => {
       await loadActiveSession();
-      await getCameraPermissions();
+      await requestCam();
       await checkCameraAvailability();
     };
     init();
-  }, [loadActiveSession, getCameraPermissions, checkCameraAvailability]);
+  }, [loadActiveSession, requestCam, checkCameraAvailability]);
 
   // Auto-ouverture de la caméra si demandé, dès que la permission est accordée
   useEffect(() => {
@@ -530,34 +524,27 @@ export default function QRCodeScannerOptimized({
         >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        {isWeb ? (
-          <CameraView
-            style={StyleSheet.absoluteFillObject}
-            facing={cameraFacing}
-            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            // @ts-ignore
-            onMountError={(e: any) => {
-              console.error('❌ CAMÉRA (web) - Erreur montage:', e);
-              if (cameraFacing === 'back') {
-                setCameraFacing('front');
-                setCameraError('Impossible d\'ouvrir la caméra arrière, tentative avec la caméra avant...');
-              } else {
-                setCameraError(e?.message || 'Erreur caméra inconnue');
-              }
-            }}
-            // @ts-ignore
-            onCameraReady={() => {
-              console.log('✅ CAMÉRA (web) - Prête, facing =', cameraFacing);
-              setCameraError(null);
-            }}
-          />
-        ) : (
-          <BarCodeScanner
-            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-            style={StyleSheet.absoluteFillObject}
-          />
-        )}
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          facing={cameraFacing}
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          // @ts-ignore
+          onMountError={(e: any) => {
+            console.error('❌ CAMÉRA - Erreur montage:', e);
+            if (cameraFacing === 'back') {
+              setCameraFacing('front');
+              setCameraError('Impossible d\'ouvrir la caméra arrière, tentative avec la caméra avant...');
+            } else {
+              setCameraError(e?.message || 'Erreur caméra inconnue');
+            }
+          }}
+          // @ts-ignore
+          onCameraReady={() => {
+            console.log('✅ CAMÉRA - Prête, facing =', cameraFacing);
+            setCameraError(null);
+          }}
+        />
 
         {/* Optionnel: cadre visuel */}
         <View style={styles.scannerOverlay}>
