@@ -214,7 +214,9 @@ export const useActiveSession = (coachId: string, onSessionEnd?: (appointmentId:
     loading,
     loadActiveSession,
     startSession,
-    endSession,
+  endSession,
+  // Fournit fin de session + résumé (present/total) si disponible
+  finalizeActiveSession: endSession,
     endSessionWithConfirmation
   };
 };

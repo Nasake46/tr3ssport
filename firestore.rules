@@ -1,0 +1,54 @@
+// Fichier généré à partir de firebase-rules-unified.txt
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() { return request.auth != null; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function isAdmin() { return isAuth() && userDoc().data.role == 'admin'; }
+    function appointment(appointmentId) { return get(/databases/$(database)/documents/appointments/$(appointmentId)); }
+    function isCoachAssignedTo(appointmentId) { return isAuth() && (request.auth.uid in appointment(appointmentId).data.coachIds); }
+    function appointmentUpdateAllowedFields() { return ['globalStatus','sessionStartedAt','sessionStartedBy','sessionEndedAt','sessionEndedBy','updatedAt','startMode','qrStatus','attendanceSummary','presentCount','absentCount','totalClients','autoCompleted','endMode']; }
+    function attendanceUpdatableFields() { return ['attendanceStatus','attendanceOrder','qrScannedAt','updatedAt','qrToken','qrGeneratedAt','status','joinedAt']; }
+    function participantSelfUpdatableFields() { return ['qrToken','qrGeneratedAt','updatedAt','userId','attendanceStatus','status','joinedAt']; }
+    function onlyAllowedAppointmentChanges(oldData, newData) { let diff = oldData.diff(newData); return diff.addedKeys().size() == 0 && diff.removedKeys().size() == 0 && diff.changedKeys().hasOnly(appointmentUpdateAllowedFields()); }
+    function onlyAllowedAttendanceChanges(oldData, newData) { let diff = oldData.diff(newData); return diff.addedKeys().hasOnly(attendanceUpdatableFields()) && diff.removedKeys().size() == 0 && diff.changedKeys().hasOnly(attendanceUpdatableFields()) && (!diff.changedKeys().hasAny(['status']) || newData.status in ['accepted','declined','pending']) && (!diff.changedKeys().hasAny(['attendanceStatus']) || newData.attendanceStatus in ['accepted','declined','pending','waiting']); }
+    function onlyAllowedParticipantSelfChanges(oldData, newData) { let diff = oldData.diff(newData); return diff.addedKeys().hasOnly(participantSelfUpdatableFields()) && diff.removedKeys().size() == 0 && diff.changedKeys().hasOnly(participantSelfUpdatableFields()) && (!diff.changedKeys().hasAny(['userId']) || oldData.userId == null || oldData.userId == '') && (!diff.changedKeys().hasAny(['attendanceStatus']) || newData.attendanceStatus in ['accepted','declined','pending','waiting']) && (!diff.changedKeys().hasAny(['status']) || newData.status in ['accepted','declined','pending']) && oldData.role == newData.role && oldData.appointmentId == newData.appointmentId; }
+
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.role in ['user','coach'];
+      allow update: if request.auth != null && ((request.auth.uid == userId && request.resource.data.role == resource.data.role) || (userDoc().data.role == 'admin')) && userDoc().data.role != 'observer';
+      allow delete: if request.auth != null && userDoc().data.role == 'admin';
+    }
+
+    match /participants/{participantDocId} { allow read: if isAuth(); allow write: if false; }
+
+    match /conversations/{conversationId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+      allow write: if request.auth != null && request.auth.uid in request.resource.data.members;
+      match /messages/{messageId} { allow read, write: if isAuth(); }
+    }
+
+    match /appointments/{appointmentId} {
+      allow create: if isAuth();
+      allow read: if isAuth();
+      allow update: if isAdmin() || ( isCoachAssignedTo(appointmentId) && onlyAllowedAppointmentChanges(resource.data, request.resource.data) );
+      allow delete: if isAdmin();
+    }
+
+    match /appointmentParticipants/{participantId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAdmin() || ( isCoachAssignedTo(request.resource.data.appointmentId) && resource.data.appointmentId == request.resource.data.appointmentId && resource.data.role == request.resource.data.role && resource.data.userId == request.resource.data.userId && onlyAllowedAttendanceChanges(resource.data, request.resource.data) ) || ( request.auth != null && (resource.data.role == 'client' || resource.data.role == 'coach') && (resource.data.userId == request.auth.uid || resource.data.userId == null || resource.data.userId == '') && onlyAllowedParticipantSelfChanges(resource.data, request.resource.data) );
+      allow delete: if isAdmin();
+    }
+
+    match /coach_tags/{tagId} { allow create: if request.auth != null && request.auth.uid == request.resource.data.coachId; allow read: if request.auth != null; allow update: if request.auth != null && request.auth.uid == resource.data.coachId; allow delete: if request.auth != null && request.auth.uid == resource.data.coachId; }
+    match /contactRequests/{requestId} { allow create: if request.auth != null && request.resource.data.fromId == request.auth.uid; allow read: if request.auth != null && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid); allow update: if request.auth != null && resource.data.toId == request.auth.uid && request.resource.data.status in ['accepted','rejected']; allow delete: if false; }
+    match /invitations/{invitationId} { allow create: if isAuth(); allow read: if isAuth(); allow update: if isAuth(); allow delete: if isAdmin(); }
+    match /coachApplications/{applicationId} { allow create: if request.auth != null && request.resource.data.userId == request.auth.uid; allow read: if request.auth != null && (userDoc().data.role == 'admin' || resource.data.userId == request.auth.uid); allow update, delete: if request.auth != null && userDoc().data.role == 'admin'; }
+    match /bans/{banId} { allow create, update, delete: if request.auth != null && userDoc().data.role == 'admin'; allow read: if request.auth != null && (userDoc().data.role in ['admin','observer']); }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

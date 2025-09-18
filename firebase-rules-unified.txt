@@ -2,8 +2,75 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAuth() { return request.auth != null; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function isAdmin() { return isAuth() && userDoc().data.role == 'admin'; }
+    function appointment(appointmentId) { return get(/databases/$(database)/documents/appointments/$(appointmentId)); }
+    function isCoachAssignedTo(appointmentId) {
+      return isAuth() && (request.auth.uid in appointment(appointmentId).data.coachIds);
+    }
+    function appointmentUpdateAllowedFields() {
+      // Champs modifiables côté coach/admin pour pilotage séance
+      return ['globalStatus','sessionStartedAt','sessionStartedBy','sessionEndedAt','sessionEndedBy','updatedAt','startMode','qrStatus','attendanceSummary','presentCount','absentCount','totalClients','autoCompleted','endMode'];
+    }
+    function appointmentUpdateAllowedFieldsWithCoachIds() {
+      // Extension utilisée lors de la revendication (self-claim) d'un coach manquant
+      return ['globalStatus','sessionStartedAt','sessionStartedBy','sessionEndedAt','sessionEndedBy','updatedAt','startMode','qrStatus','attendanceSummary','presentCount','absentCount','totalClients','autoCompleted','endMode','coachIds'];
+    }
+    function attendanceUpdatableFields() {
+      // Champs qu'un coach/admin peut mettre à jour sur un participant (présence)
+    // (extension) 'status' (invitation accepted/declined) et 'joinedAt' lors de l'acceptation
+    return ['attendanceStatus','attendanceOrder','qrScannedAt','updatedAt','qrToken','qrGeneratedAt','status','joinedAt'];
+    }
+    function participantSelfUpdatableFields() {
+      // Champs qu'un participant (client OU coach) peut modifier lui‑même
+      //  - qrToken / qrGeneratedAt : génération QR participant
+      //  - updatedAt : marquage technique
+      //  - userId : liaison invitation (seulement si vide auparavant)
+      //  (extension coach pour permettre « accepter une séance » en réclamant un slot coach pré-créé)
+  //  - attendanceStatus : uniquement pour définir son propre statut (ex: accepted / declined)
+  //  - status / joinedAt : acceptation/refus d'invitation + horodatage acceptance
+  return ['qrToken','qrGeneratedAt','updatedAt','userId','attendanceStatus','status','joinedAt'];
+    }
+    function onlyAllowedAppointmentChanges(oldData, newData) {
+      let diff = oldData.diff(newData);
+  // Assoupli: n'exige plus aucun addedKeys (permet ajout ponctuel de updatedAt si absent)
+  return diff.removedKeys().size() == 0 &&
+     diff.changedKeys().hasOnly(appointmentUpdateAllowedFields());
+    }
+    function coachSelfClaim(oldData, newData) {
+      // Permet à un coach authentifié non encore listé dans coachIds d'ajouter son UID + (optionnel) globalStatus etc.
+      let diff = oldData.diff(newData);
+      return diff.addedKeys().size() == 0 &&
+             diff.removedKeys().size() == 0 &&
+             diff.changedKeys().hasOnly(appointmentUpdateAllowedFieldsWithCoachIds()) &&
+             diff.changedKeys().hasAny(['coachIds']) &&
+             !(request.auth.uid in oldData.coachIds) &&
+             (request.auth.uid in newData.coachIds) &&
+             newData.coachIds.size() == oldData.coachIds.size() + 1;
+    }
+    function onlyAllowedAttendanceChanges(oldData, newData) {
+      let diff = oldData.diff(newData);
+      // Version assouplie: on ne vérifie plus l'ensemble exact des ajouts tant que les clés modifiées restent dans la liste.
+      // Objectifs: réduire les erreurs "insufficient permissions" lors de l'ajout ponctuel de joinedAt / updatedAt.
+      return diff.removedKeys().size() == 0 &&
+        diff.changedKeys().hasOnly(attendanceUpdatableFields()) &&
+        (!diff.changedKeys().hasAny(['status']) || newData.status in ['accepted','declined','pending']) &&
+        (!diff.changedKeys().hasAny(['attendanceStatus']) || newData.attendanceStatus in ['accepted','declined','pending','waiting']);
+    }
+    function onlyAllowedParticipantSelfChanges(oldData, newData) {
+      let diff = oldData.diff(newData);
+      // Version assouplie: tolère l'ajout de clés autorisées sans exiger hasOnly() sur addedKeys.
+      return diff.removedKeys().size() == 0 &&
+        diff.changedKeys().hasOnly(participantSelfUpdatableFields()) &&
+        (!diff.changedKeys().hasAny(['userId']) || oldData.userId == null || oldData.userId == '' ) &&
+        (!diff.changedKeys().hasAny(['attendanceStatus']) || newData.attendanceStatus in ['accepted','declined','pending','waiting']) &&
+        (!diff.changedKeys().hasAny(['status']) || newData.status in ['accepted','declined','pending']) &&
+        oldData.role == newData.role && oldData.appointmentId == newData.appointmentId;
+    }
+
     match /users/{userId} {
-  // Lecture ouverte à tout utilisateur authentifié (inclut observateurs)
+      // Lecture ouverte à tout utilisateur authentifié (inclut observateurs)
       allow read: if request.auth != null;
 
       // Création : uniquement par l'utilisateur lui‑même, rôle limité (anti auto-création admin)
@@ -11,29 +78,26 @@ service cloud.firestore {
         && request.auth.uid == userId
         && request.resource.data.role in ['user', 'coach'];
 
-    // Mise à jour :
-    //  - Soit l'utilisateur modifie SON document sans changer son propre rôle
-    //  - Soit un admin (selon son doc utilisateur) peut modifier n'importe quel utilisateur y compris le rôle
-    //  - Un observateur n'a aucun droit d'écriture
+      // Mise à jour :
       allow update: if request.auth != null && (
         (
           request.auth.uid == userId &&
-          // Empêche un user/coach de s'auto-promouvoir (le rôle ne change pas)
           request.resource.data.role == resource.data.role
         ) || (
-          // Admin identifié via son document utilisateur
-      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
         )
-    ) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'observer';
+      ) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'observer';
 
-      // Suppression : réservée aux admins (ou auto‑suppression possible si besoin -> à activer si souhaité)
+      // Suppression : réservée aux admins
       allow delete: if request.auth != null && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );
     }
 
-    match /participants/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Ancienne collection éventuelle /participants — à restreindre si non utilisée
+    match /participants/{participantDocId} {
+      allow read: if isAuth();
+      allow write: if false; // verrouillée (utiliser appointmentParticipants)
     }
 
     match /conversations/{conversationId} {
@@ -41,99 +105,66 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid in request.resource.data.members;
 
       match /messages/{messageId} {
-        allow read, write: if true;
+        allow read, write: if isAuth();
       }
     }
 
-    // SYSTÈME UNIFIÉ APPOINTMENTS (SOLO + GROUPE)
+    // SYSTÈME UNIFIÉ APPOINTMENTS (séances)
     match /appointments/{appointmentId} {
-      // Création: autorisée pour tous les utilisateurs authentifiés
-      allow create: if request.auth != null;
-
-      // Lecture: autorisée pour tous les utilisateurs authentifiés
-      allow read: if request.auth != null;
-
-      // Mise à jour: autorisée pour tous les utilisateurs authentifiés
-      allow update: if request.auth != null;
-
-      // Suppression: autorisée pour tous les utilisateurs authentifiés
-      allow delete: if request.auth != null;
+  // Version assouplie: toutes opérations pour tout utilisateur authentifié (debug / phase initiale)
+  // NOTE: Pour revenir à une version stricte, rétablir les conditions précédentes.
+  allow create: if isAuth();
+  allow read: if isAuth();
+  allow update: if isAuth();
+  allow delete: if isAuth();
     }
 
-    // CORRECTION: Nom de collection correct pour les participants
+    // Participants des rendez-vous (présence)
     match /appointmentParticipants/{participantId} {
-      // Permettre toutes les opérations pour les utilisateurs authentifiés
-      allow create, read, update, delete: if request.auth != null;
+      // Version assouplie: toutes opérations pour tout utilisateur authentifié
+      allow create, read, update, delete: if isAuth();
     }
-    
+
+    // Collection legacy /participants (si encore utilisée) – autoriser lecture/écriture propriétaire uniquement (ou simplifier davantage si besoin)
+    match /participants/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // coach_tags
     match /coach_tags/{tagId} {
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.coachId;
-      
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.coachId;
       allow read: if request.auth != null;
-      
-      allow update: if request.auth != null && 
-        request.auth.uid == resource.data.coachId;
-      
-      allow delete: if request.auth != null && 
-        request.auth.uid == resource.data.coachId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.coachId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.coachId;
     }
 
     match /contactRequests/{requestId} {
       allow create: if request.auth != null && request.resource.data.fromId == request.auth.uid;
-
-      allow read: if request.auth != null &&
-        (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid);
-
-      allow update: if request.auth != null &&
-        resource.data.toId == request.auth.uid &&
-        request.resource.data.status in ['accepted', 'rejected'];
-
+      allow read: if request.auth != null && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid);
+      allow update: if request.auth != null && resource.data.toId == request.auth.uid && request.resource.data.status in ['accepted','rejected'];
       allow delete: if false;
     }
 
-    // NOUVELLE COLLECTION : Invitations des rendez-vous
+    // Invitations RDV (à durcir ensuite si besoin)
     match /invitations/{invitationId} {
-      // Création : autorisée pour tous les utilisateurs authentifiés
-      allow create: if request.auth != null;
-      
-      // Lecture : autorisée pour tous les utilisateurs authentifiés (simplifiée pour debug)
-      allow read: if request.auth != null;
-      
-      // Mise à jour : autorisée pour tous les utilisateurs authentifiés
-      allow update: if request.auth != null;
-      
-      // Suppression : autorisée pour tous les utilisateurs authentifiés
-      allow delete: if request.auth != null;
+      allow create: if isAuth();
+      allow read: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
     }
 
-    // Demandes d'agrément des coachs
     match /coachApplications/{applicationId} {
-      // Création par un utilisateur authentifié (sa propre candidature)
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      // Lecture : admin seulement (ou le propriétaire de sa propre demande si besoin)
-      allow read: if request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-        || resource.data.userId == request.auth.uid
-      );
-      // Mise à jour/Suppression : réservé aux admins
-      allow update, delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read: if request.auth != null && (userDoc().data.role == 'admin' || resource.data.userId == request.auth.uid);
+      allow update, delete: if request.auth != null && userDoc().data.role == 'admin';
     }
 
-    // Liste des bannissements (archives)
     match /bans/{banId} {
-      // Création/Lecture/Mise à jour/Suppression : réservées aux admins
-      // Lecture autorisée aussi aux observateurs (lecture seule)
-      allow create, update, delete: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      allow read: if request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'observer'
-      );
+      allow create, update, delete: if request.auth != null && userDoc().data.role == 'admin';
+      allow read: if request.auth != null && (userDoc().data.role in ['admin','observer']);
     }
 
-    // Règle par défaut - doit rester à la fin
+    // Règle par défaut (deny all)
     match /{document=**} {
       allow read, write: if false;
     }

@@ -12,9 +12,12 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { auth, firestore } from '@/firebase';
-import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, Timestamp, collection, query, where, getDocs } from 'firebase/firestore';
+// Ajout addDoc
+import { addDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
-import { backOrRoleHome } from '@/services/navigationService';
+import { backOrRoleHome } from '../../services/navigationService';
+import { updateParticipantStatus } from '../../services/appointmentService';
 
 // Types pour les rendez-vous
 interface Appointment {
@@ -56,6 +59,7 @@ export default function AppointmentDetail() {
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [responseAction, setResponseAction] = useState<'accepted' | 'refused'>('accepted');
   const [comment, setComment] = useState('');
+  const [coachParticipants, setCoachParticipants] = useState<any[]>([]); // participants docs pour les coachs
 
   const currentUser = auth.currentUser;
 
@@ -64,8 +68,8 @@ export default function AppointmentDetail() {
       backOrRoleHome();
       return;
     }
-
     loadAppointmentDetail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentId, currentUser]);
 
   const safeToDate = (value: any): Date | null => {
@@ -79,38 +83,19 @@ export default function AppointmentDetail() {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  const formatDecisionDate = (value: any): string | null => {
-    const d = safeToDate(value);
-    if (!d) return null;
-    return `Le ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-  };
-
   const loadAppointmentDetail = async () => {
     try {
       console.log('🔍 APPOINTMENT DETAIL - Chargement RDV:', appointmentId);
-      
-      // Récupérer les détails du rendez-vous
       const appointmentDoc = await getDoc(doc(firestore, 'appointments', appointmentId));
-      
-      if (!appointmentDoc.exists()) {
-        Alert.alert('Erreur', 'Rendez-vous introuvable');
-        backOrRoleHome();
-        return;
-      }
-
+      if (!appointmentDoc.exists()) { Alert.alert('Erreur', 'Rendez-vous introuvable'); backOrRoleHome(); return; }
       const data = appointmentDoc.data() as any;
-
-      // Normaliser les décisions pour convertir respondedAt en Date
-      const rawDecisions = (data.decisions || {}) as Record<string, any>;
-      const normalizedDecisions: { [coachId: string]: CoachDecision } = {};
-      for (const [coachId, dec] of Object.entries(rawDecisions)) {
-        normalizedDecisions[coachId] = {
-          status: dec?.status,
-          comment: dec?.comment || '',
-          respondedAt: safeToDate(dec?.respondedAt) || new Date(),
-        } as CoachDecision;
-      }
-
+      // Charger participants coachs (nouveau modèle)
+      let coachParts: any[] = [];
+      try {
+        const partsSnap = await getDocs(query(collection(firestore, 'appointmentParticipants'), where('appointmentId','==', appointmentId), where('role','==','coach')));
+        coachParts = partsSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+      } catch(e){ console.warn('⚠️ APPOINTMENT DETAIL - Impossible de charger participants coachs', e); }
+      setCoachParticipants(coachParts);
       const appointmentData: Appointment = {
         id: appointmentDoc.id,
         type: data.type,
@@ -120,9 +105,13 @@ export default function AppointmentDetail() {
         location: data.location || '',
         description: data.description || '',
         date: data.date?.toDate() || new Date(),
-        status: data.status || 'pending',
+        status: (data.status || data.globalStatus) === 'confirmed'
+          ? 'accepted'
+          : (data.status || data.globalStatus) === 'declined'
+            ? 'refused'
+            : 'pending',
         createdAt: data.createdAt?.toDate() || new Date(),
-        decisions: normalizedDecisions,
+        decisions: {},
         invitedEmails: data.invitedEmails || [],
         notes: data.notes || ''
       };
@@ -172,67 +161,57 @@ export default function AppointmentDetail() {
   };
 
   const handleResponse = (action: 'accepted' | 'refused') => {
+    console.log('[APPT_DETAIL] handleResponse appelé', { action, appointmentId, currentUser: currentUser?.uid });
     setResponseAction(action);
     setComment('');
     setShowResponseModal(true);
   };
 
   const submitResponse = async () => {
-    if (!appointment || !currentUser) return;
-
+    if (!appointment || !currentUser) { console.log('[APPT_DETAIL] submitResponse abort - missing appointment/currentUser'); return; }
+    console.log('[APPT_DETAIL] submitResponse start', { appointmentId: appointment.id, currentUser: currentUser.uid, desiredAction: responseAction });
     try {
       setActionLoading(true);
-      console.log('🔄 APPOINTMENT DETAIL - Envoi réponse:', responseAction);
-
-      // Mettre à jour la décision du coach dans Firestore
-      const appointmentRef = doc(firestore, 'appointments', appointment.id);
-      
-      const newDecision: CoachDecision = {
-        status: responseAction,
-        comment: comment.trim(),
-        respondedAt: new Date()
-      };
-
-      const updatedDecisions = {
-        ...appointment.decisions,
-        [currentUser.uid]: newDecision
-      };
-
-      await updateDoc(appointmentRef, {
-        [`decisions.${currentUser.uid}`]: {
-          status: responseAction,
-          comment: comment.trim(),
-          respondedAt: Timestamp.now()
+      console.log('[APPT_DETAIL] coachParticipants snapshot', coachParticipants.map(p=>({id:p.id,userId:p.userId,email:p.email,status:p.status,role:p.role})));
+      let me = coachParticipants.find(p => p.userId === currentUser.uid);
+      if (!me) {
+        console.warn('[APPT_DETAIL] Participant coach introuvable – tentative de création rétroactive');
+        try {
+          const newRef = await addDoc(collection(firestore,'appointmentParticipants'), {
+            appointmentId: appointment.id,
+            userId: currentUser.uid,
+            email: currentUser.email || '',
+            role: 'coach',
+            status: 'pending',
+            attendanceStatus: 'pending',
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          console.log('[APPT_DETAIL] Participant coach créé rétroactivement', newRef.id);
+          me = { id: newRef.id, userId: currentUser.uid, status:'pending', role:'coach' } as any;
+        } catch(e) {
+          console.error('[APPT_DETAIL] Échec création participant coach rétroactif', e);
+          Alert.alert('Erreur','Impossible de créer votre participation (coach)');
+          return;
         }
-      });
-
-      // Mettre à jour l'état local
-      setAppointment({
-        ...appointment,
-        decisions: updatedDecisions
-      });
-
+      }
+      const newStatus = responseAction === 'accepted' ? 'accepted' : 'declined';
+  console.log('[APPT_DETAIL] updateParticipantStatus invocation (REVERT)', { participantId: me.id, newStatus });
+  await updateParticipantStatus(me.id, newStatus); // service mettra à jour globalStatus si conditions remplies
+  console.log('[APPT_DETAIL] updateParticipantStatus terminé, rechargement participants');
+      try {
+        const partsSnap = await getDocs(query(collection(firestore, 'appointmentParticipants'), where('appointmentId','==', appointment.id), where('role','==','coach')));
+        const coachParts = partsSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+        console.log('[APPT_DETAIL] participants rechargés', (coachParts as any[]).map(p=>({id:p.id,userId:(p as any).userId,status:(p as any).status})));
+        setCoachParticipants(coachParts);
+      } catch(e){ console.warn('[APPT_DETAIL] Erreur reload participants', e); }
       setShowResponseModal(false);
-      
-      const actionText = responseAction === 'accepted' ? 'accepté' : 'refusé';
-      Alert.alert(
-        'Succès',
-        `Vous avez ${actionText} ce rendez-vous.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => backOrRoleHome()
-          }
-        ]
-      );
-
-      console.log('✅ APPOINTMENT DETAIL - Réponse envoyée');
+      console.log('[APPT_DETAIL] Modal fermé, affichage alerte succès');
+      Alert.alert('Succès', `Vous avez ${responseAction === 'accepted' ? 'accepté' : 'refusé'} ce rendez-vous.`, [{ text:'OK', onPress: () => { console.log('[APPT_DETAIL] Retour après succès'); backOrRoleHome(); } }]);
     } catch (error) {
       console.error('❌ APPOINTMENT DETAIL - Erreur réponse:', error);
-      Alert.alert('Erreur', 'Impossible d\'envoyer votre réponse');
-    } finally {
-      setActionLoading(false);
-    }
+      Alert.alert('Erreur', 'Impossible denvoyer votre réponse');
+    } finally { setActionLoading(false); console.log('[APPT_DETAIL] submitResponse end'); }
   };
 
   const formatDate = (date: Date) => {
@@ -246,23 +225,33 @@ export default function AppointmentDetail() {
     });
   };
 
-  const getMyDecision = () => {
-    if (!appointment || !currentUser) return null;
-    return appointment.decisions[currentUser.uid];
+  // SUPPR: getMyDecision basé sur appointment.decisions (legacy)
+  // Nouveau helpers basés sur coachParticipants
+  const getMyCoachParticipant = () => {
+    if (!currentUser) return null;
+    return coachParticipants.find(p => p.userId === currentUser.uid) || null;
   };
-
-  const canRespond = () => {
-    const myDecision = getMyDecision();
-    return !myDecision; // Peut répondre seulement s'il n'a pas encore répondu
+  const hasResponded = () => {
+    const me = getMyCoachParticipant();
+    return !!me && me.status !== 'pending';
   };
-
   const getResponsesStatus = () => {
-    if (!appointment) return '';
-    
-    const totalCoaches = appointment.coachIds.length;
-    const responses = Object.keys(appointment.decisions).length;
-    
-    return `${responses}/${totalCoaches} coaches ont répondu`;
+    const total = coachParticipants.length;
+    if (total === 0) return '0/0 coach a répondu';
+    const responded = coachParticipants.filter(c => c.status === 'accepted' || c.status === 'declined').length;
+    return `${responded}/${total} coaches ont répondu`;
+  };
+
+  const renderCoachResponses = () => {
+    return coachParticipants.map(cp => {
+      const status = cp.status === 'accepted' ? 'Accepté' : cp.status === 'declined' ? 'Refusé' : 'En attente';
+      return (
+        <View key={cp.id} style={styles.coachResponseRow}>
+          <Text style={styles.coachResponseName}>{cp.userId || cp.email || 'Coach'}</Text>
+          <Text style={styles.coachResponseStatus}>{status}</Text>
+        </View>
+      );
+    });
   };
 
   if (loading) {
@@ -282,8 +271,13 @@ export default function AppointmentDetail() {
     );
   }
 
-  const myDecision = getMyDecision();
-  const myDecisionDateLabel = formatDecisionDate(myDecision?.respondedAt);
+  const myParticipant = getMyCoachParticipant();
+  const myResponded = hasResponded();
+  const myStatus = myParticipant?.status; // 'accepted' | 'declined' | 'pending'
+  const myDecisionDateLabel = (() => {
+    const d = safeToDate(myParticipant?.updatedAt || myParticipant?.joinedAt);
+    return d ? `Le ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : null;
+  })();
 
   return (
     <View style={styles.container}>
@@ -400,53 +394,34 @@ export default function AppointmentDetail() {
             <Text style={styles.sectionTitle}>Statut des réponses</Text>
             <Text style={styles.responsesStatus}>{getResponsesStatus()}</Text>
           </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Réponses des coachs</Text>
+            {renderCoachResponses()}
+          </View>
         </View>
 
-        {myDecision ? (
+        {/* Bloc réponse coach */}
+        {myResponded ? (
           <View style={styles.responseCard}>
             <Text style={styles.responseTitle}>Votre réponse</Text>
             <View style={styles.myResponseContainer}>
-              <View style={[
-                styles.myStatusBadge,
-                { backgroundColor: myDecision.status === 'accepted' ? '#27ae60' : '#e74c3c' }
-              ]}>
-                <Text style={styles.myStatusText}>
-                  {myDecision.status === 'accepted' ? 'Accepté' : 'Refusé'}
-                </Text>
+              <View style={[styles.myStatusBadge,{ backgroundColor: myStatus === 'accepted' ? '#27ae60' : '#e74c3c' }]}>
+                <Text style={styles.myStatusText}>{myStatus === 'accepted' ? 'Accepté' : 'Refusé'}</Text>
               </View>
-              {myDecisionDateLabel && (
-                <Text style={styles.responseDate}>
-                  {myDecisionDateLabel}
-                </Text>
-              )}
+              {myDecisionDateLabel && (<Text style={styles.responseDate}>{myDecisionDateLabel}</Text>)}
             </View>
-            {myDecision.comment && (
-              <View style={styles.commentContainer}>
-                <Text style={styles.commentLabel}>Votre commentaire :</Text>
-                <Text style={styles.commentText}>{myDecision.comment}</Text>
-              </View>
-            )}
           </View>
         ) : (
           <View style={styles.actionsCard}>
             <Text style={styles.actionsTitle}>Répondre à cette demande</Text>
-            <Text style={styles.actionsSubtitle}>
-              Acceptez-vous ce rendez-vous ?
-            </Text>
-            
+            <Text style={styles.actionsSubtitle}>Acceptez-vous ce rendez-vous ?</Text>
             <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.refuseButton]}
-                onPress={() => handleResponse('refused')}
-              >
+              <TouchableOpacity style={[styles.actionButton, styles.refuseButton]} onPress={() => handleResponse('refused')}>
                 <Ionicons name="close" size={20} color="white" />
                 <Text style={styles.actionButtonText}>Refuser</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={() => handleResponse('accepted')}
-              >
+              <TouchableOpacity style={[styles.actionButton, styles.acceptButton]} onPress={() => handleResponse('accepted')}>
                 <Ionicons name="checkmark" size={20} color="white" />
                 <Text style={styles.actionButtonText}>Accepter</Text>
               </TouchableOpacity>
@@ -831,6 +806,23 @@ const styles = StyleSheet.create({
   confirmModalButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  coachResponseRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  coachResponseName: {
+    fontSize: 14,
+    color: '#333',
+  },
+  coachResponseStatus: {
+    fontSize: 14,
+    color: '#666',
     fontWeight: '600',
   },
 });

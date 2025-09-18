@@ -10,11 +10,10 @@ import {
   Alert
 } from 'react-native';
 import { router } from 'expo-router';
-import { auth, firestore } from '@/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { Ionicons } from '@expo/vector-icons';
+import { auth } from '@/firebase';
 import { getAllAppointmentsForClient } from '@/services/appointmentService';
 import AppointmentDetailModal from '@/components/appointments/AppointmentDetailModal';
+import { Ionicons } from '@expo/vector-icons';
 
 // Types pour les rendez-vous
 interface Appointment {
@@ -50,8 +49,8 @@ export default function ClientDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [detailVisible, setDetailVisible] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false); // TODO: pourra être retiré si modal supprimée définitivement
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null); // idem
 
   const currentUser = auth.currentUser;
 
@@ -63,7 +62,7 @@ export default function ClientDashboard() {
     }
 
     loadAppointments();
-  }, [currentUser]);
+  }, [currentUser]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // Vérifier si l'utilisateur est connecté avant de rendre le composant
   if (!currentUser) {
@@ -113,7 +112,8 @@ export default function ClientDashboard() {
         let userStatus: 'pending' | 'accepted' | 'refused' = 'pending';
         if (apt.createdBy === currentUser.uid) {
           // L'utilisateur est le créateur - utiliser le statut global
-          userStatus = apt.globalStatus === 'confirmed' ? 'accepted' : apt.globalStatus === 'declined' ? 'refused' : 'pending';
+          const gs = (apt as any).status || apt.globalStatus;
+          userStatus = gs === 'confirmed' ? 'accepted' : gs === 'declined' ? 'refused' : 'pending';
         } else {
           // L'utilisateur est invité - trouver son statut personnel
           const userParticipant = apt.clients.find(c => c.userId === currentUser.uid || c.email === currentUser.email);
@@ -212,11 +212,14 @@ export default function ClientDashboard() {
 
   const getOverallStatus = (appointment: Appointment) => {
     const totalCoaches = appointment.coachIds.length;
-    const decisions = appointment.decisions;
-    
-    const acceptedCount = Object.values(decisions).filter(d => d.status === 'accepted').length;
-    const refusedCount = Object.values(decisions).filter(d => d.status === 'refused').length;
-    
+    // Utiliser désormais les statuts réels issus des participants (coachesInfo)
+    const coachStatuses = (appointment.coachesInfo || []).map(c => c.status);
+    const acceptedCount = coachStatuses.filter(s => s === 'accepted').length;
+    const refusedCount = coachStatuses.filter(s => s === 'refused').length;
+
+    if (totalCoaches === 0) {
+      return { status: 'accepted', text: '✅ Aucun coach requis' };
+    }
     if (acceptedCount === totalCoaches) {
       return { status: 'accepted', text: `✅ Tous acceptés (${acceptedCount})` };
     } else if (refusedCount === totalCoaches) {

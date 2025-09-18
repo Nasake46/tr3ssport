@@ -13,16 +13,7 @@ import {
 import { router } from 'expo-router';
 import { Coach } from '@/models/coach';
 import { auth, firestore } from '@/firebase';
-import {
-  collection,
-  addDoc,
-  Timestamp,
-  getDocs,
-  query,
-  where,
-  doc,
-  getDoc,
-} from 'firebase/firestore';
+import { collection, addDoc, Timestamp, getDocs, query, where, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { backOrRoleHome } from '@/services/navigationService';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
@@ -159,6 +150,7 @@ const createAppointment = async (
 
     if (formData.invitedEmails && formData.invitedEmails.length > 0) {
       console.log('📮 CRÉATION RDV - Création des invitations...');
+
       const emailVerification = await verifyAllInvitedEmails(formData.invitedEmails);
       for (const u of emailVerification.userData) {
         const invitationData = {
@@ -176,6 +168,50 @@ const createAppointment = async (
         await addDoc(collection(firestore, 'invitations'), invitationData);
         console.log('✅ CRÉATION RDV - Invitation créée pour:', u.email);
       }
+    }
+
+    // 4. Créer les documents appointmentParticipants
+    try {
+      // a) Créateur en tant que client (accepted)
+      await addDoc(collection(firestore, 'appointmentParticipants'), {
+        appointmentId,
+        userId,
+        email: userEmail,
+        role: 'client',
+        status: 'accepted',
+        attendanceStatus: 'pending',
+        joinedAt: Timestamp.now(),
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      // b) Invités (pending)
+      if (verifiedInvites.userData && verifiedInvites.userData.length > 0) {
+        for (const u of verifiedInvites.userData) {
+          await addDoc(collection(firestore, 'appointmentParticipants'), {
+            appointmentId,
+            userId: u.id,
+            email: u.email,
+            role: 'client',
+            status: 'pending',
+            attendanceStatus: 'pending',
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+        }
+      }
+      // c) Agrégats sur le doc appointment (clientIds/participantsIds)
+      const invitedIds = (verifiedInvites.userData || []).map(u => u.id);
+      const participantsIds = Array.from(new Set([userId, ...formData.coachIds, ...invitedIds]));
+      const clientIds = Array.from(new Set([userId, ...invitedIds]));
+      await updateDoc(doc(firestore, 'appointments', appointmentId), {
+        participantsIds,
+        clientIds,
+        participantsClientIds: clientIds,
+        updatedAt: Timestamp.now(),
+      });
+      console.log('✅ CRÉATION RDV - Participants créés + agrégats mis à jour');
+    } catch (e) {
+      console.warn('⚠️ CRÉATION RDV - Erreur création participants/agrégats (poursuite)', e);
     }
 
     console.log('✅ CRÉATION RDV - Appointment créé avec ID:', appointmentId);

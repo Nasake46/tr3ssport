@@ -12,7 +12,7 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { auth } from '@/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import * as userService from '@/services/userService';
@@ -32,7 +32,6 @@ export default function AdminUsersManagement() {
   const [selectedUser, setSelectedUser] = useState<userService.User | null>(null);
   const [userAppointments, setUserAppointments] = useState<userService.Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
-  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   // Ban modal
   const [banModalVisible, setBanModalVisible] = useState(false);
@@ -118,7 +117,6 @@ export default function AdminUsersManagement() {
   const loadUserAppointments = async (userId: string) => {
     console.log('🔄 ADMIN USERS - Chargement RDV pour:', userId, '(fast puis fallback)');
     setLoadingAppointments(true);
-    setAppointmentsError(null);
     try {
       // 1. Fast path (createdBy / coachIds / participantsIds)
       const fast = await userService.getUserAppointmentsFast(userId);
@@ -135,7 +133,7 @@ export default function AdminUsersManagement() {
       }
     } catch (error) {
       console.error('❌ ADMIN USERS - Erreur chargement appointments (fast+fallback):', error);
-      setAppointmentsError('Impossible de charger les rendez-vous');
+      // setAppointmentsError('Impossible de charger les rendez-vous');
     } finally {
       setLoadingAppointments(false);
     }
@@ -201,10 +199,16 @@ export default function AdminUsersManagement() {
     return userService.getStatusDisplayName(status);
   };
 
-  const filteredUsers = (selectedTab === 'coaches' ? coaches : clients).filter(user =>
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    userService.formatUserName(user).toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = (selectedTab === 'coaches' ? coaches : clients)
+    .filter(user =>
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      userService.formatUserName(user).toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a,b) => {
+      const an = userService.formatUserName(a) || a.email || '';
+      const bn = userService.formatUserName(b) || b.email || '';
+      return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
+    });
 
   const renderUserItem = ({ item }: { item: userService.User }) => (
   <TouchableOpacity style={styles.userItem} onPress={() => openUserDetails(item)}>

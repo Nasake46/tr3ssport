@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+
+import React, { useEffect, useState, useCallback } from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, Modal, TextInput } from 'react-native';
+
 import { useRouter } from 'expo-router';
-import { auth, firestore } from '@/firebase';
+// Remplacer alias pour compat
+import { auth, firestore } from '../../firebase';
 import { signOut } from 'firebase/auth';
 import {
   onSnapshot,
@@ -17,13 +20,17 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import QRCodeScannerOptimized from '@/components/qr/QRCodeScannerOptimized';
 
 export default function CoachHomeScreen() {
   const router = useRouter();
-  const [coachData, setCoachData] = useState<any>(null);
+  const [coachData, setCoachData] = useState<any>(null); // conservé pour future utilisation affichage
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRouterReady, setIsRouterReady] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showOpenAttendanceById, setShowOpenAttendanceById] = useState(false);
+  const [appointmentIdInput, setAppointmentIdInput] = useState('');
 
   type AppointmentLite = {
     id: string;
@@ -144,7 +151,8 @@ export default function CoachHomeScreen() {
     try { router.push(path as any); } catch (error) { console.error('Erreur de navigation:', error); }
   };
 
-  const fetchCoachData = async () => {
+  const fetchCoachData = useCallback(async () => {
+
     try {
       const user = auth.currentUser;
       if (!user) { router.replace('/(tabs)'); return; }
@@ -165,10 +173,13 @@ export default function CoachHomeScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   // Abonnement en temps réel aux demandes en attente
   useEffect(() => {
+    fetchCoachData();
+  }, [fetchCoachData]);
+
     const user = auth.currentUser;
     if (!user) return;
     const coachUid = user.uid;
@@ -245,10 +256,16 @@ export default function CoachHomeScreen() {
 
         {/* Menus principaux */}
         <View style={styles.menuContainer}>
+
+          {/* Bouton Séance active retiré */}
+          
+          <TouchableOpacity style={styles.menuButton}>
+
           <TouchableOpacity
             style={styles.menuButton}
             onPress={() => router.push('/ClientsScreen' as any)}
           >
+
             <View style={styles.iconCircle}>
               <Ionicons name="people" size={24} color="#fff" />
             </View>
@@ -268,8 +285,18 @@ export default function CoachHomeScreen() {
             </View>
             <Text style={styles.menuText}>Mes documents</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
+          
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => setShowScanner(true)}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="qr-code" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Scanner QR</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
             style={styles.menuButton}
             onPress={() => router.push({ pathname: '../EditCoachScreen', params: { edit: '1' } } as any)}
           >
@@ -365,6 +392,31 @@ export default function CoachHomeScreen() {
             </View>
             <Text style={styles.menuText}>Rafraîchir</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuButton} onPress={() => router.push('/pastSessions' as any)}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="time" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Séances passées</Text>
+          </TouchableOpacity>
+          {/* Lien vers la page d'assiduité sans ID (affiche l'état vide + scan) */}
+          <TouchableOpacity style={styles.menuButton} onPress={() => router.push('/sessionAttendance' as any)}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="list" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Assiduité</Text>
+          </TouchableOpacity>
+
+          {/* Ouvrir assiduité par ID */}
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => setShowOpenAttendanceById(true)}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="key" size={24} color="#7667ac" />
+            </View>
+            <Text style={styles.menuText}>Assiduité par ID</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Menu secondaire */}
@@ -390,8 +442,104 @@ export default function CoachHomeScreen() {
           </TouchableOpacity>
         </View>
 
+
+        {/* Séances du jour */}
+        <Text style={styles.sectionTitle}>Mes clients du jour</Text>
+        <View style={styles.sessionsContainer}>
+
+              {/* Modal Scanner: ouvre la caméra directement sans changer de page */}
+              <Modal
+                visible={showScanner}
+                animationType="none"
+                onRequestClose={() => setShowScanner(false)}
+              >
+                <View style={{ flex: 1, backgroundColor: '#000' }}>
+                  <QRCodeScannerOptimized
+                    coachId={auth.currentUser?.uid || ''}
+                    mode="scanOnly"
+                    autoOpenCamera
+                    onClose={() => setShowScanner(false)}
+                    onParticipantScanned={(res: any) => {
+                      if (res?.appointmentId) {
+                        setShowScanner(false);
+                        router.replace({ pathname: '/sessionAttendance/[appointmentId]', params: { appointmentId: res.appointmentId } } as any);
+                      }
+                    }}
+                    onSessionStarted={(appointmentId: string) => {
+                      setShowScanner(false);
+                      router.replace({ pathname: '/sessionAttendance/[appointmentId]', params: { appointmentId } } as any);
+                    }}
+                  />
+                </View>
+              </Modal>
+              {/* Modal pour ouvrir /sessionAttendance/[appointmentId] depuis un ID saisi */}
+              <Modal
+                visible={showOpenAttendanceById}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowOpenAttendanceById(false)}
+              >
+                <View style={styles.modalBackdrop}>
+                  <View style={styles.modalCard}>
+                    <Text style={styles.modalTitle}>Ouvrir l'assiduité</Text>
+                    <Text style={styles.modalSubtitle}>Saisissez l'identifiant de la séance</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="appointmentId"
+                      value={appointmentIdInput}
+                      onChangeText={setAppointmentIdInput}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <View style={styles.modalActions}>
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.modalButtonSecondary]}
+                        onPress={() => {
+                          setShowOpenAttendanceById(false);
+                          setAppointmentIdInput('');
+                        }}
+                      >
+                        <Text style={styles.modalButtonTextSecondary}>Annuler</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.modalButtonPrimary, !appointmentIdInput.trim() && { opacity: 0.5 }]}
+                        disabled={!appointmentIdInput.trim()}
+                        onPress={() => {
+                          const id = appointmentIdInput.trim();
+                          if (!id) return;
+                          setShowOpenAttendanceById(false);
+                          setAppointmentIdInput('');
+                          router.push({ pathname: '/sessionAttendance/[appointmentId]', params: { appointmentId: id } } as any);
+                        }}
+                      >
+                        <Text style={styles.modalButtonTextPrimary}>Ouvrir</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+          <View style={styles.sessionCard}>
+            <View style={styles.sessionImagePlaceholder}></View>
+            <Text style={styles.clientName}>Client 1</Text>
+            <Text style={styles.sessionTime}>Programme personnalisé</Text>
+          </View>
+          
+          <View style={styles.sessionCard}>
+            <View style={styles.sessionImagePlaceholder}></View>
+            <Text style={styles.clientName}>Client 3</Text>
+            <Text style={styles.sessionTime}>Suivi progression</Text>
+          </View>
+          
+          <View style={styles.sessionCard}>
+            <View style={styles.sessionImagePlaceholder}></View>
+            <Text style={styles.clientName}>Client 6</Text>
+            <Text style={styles.sessionTime}>Conseil nutrition</Text>
+          </View>
+        </View>
+
         {/* Notifications */}
         <Text style={styles.sectionTitle}>Notifications</Text>
+
 
         {pendingReqs.length > 0 ? (
           <View style={{ gap: 10 }}>
@@ -569,5 +717,67 @@ const styles = StyleSheet.create({
     width: 50, height: 50, borderRadius: 25, backgroundColor: '#F0F0F5', borderWidth: 1, borderColor: '#E5E5EA',
     justifyContent: 'center', alignItems: 'center', marginBottom: 8,
   },
+
+  // Modal styles for opening attendance by ID
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+  },
+  modalSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#666',
+  },
+  modalInput: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  modalActions: {
+    marginTop: 14,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalButtonSecondary: {
+    backgroundColor: '#f0f0f0',
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#007AFF',
+  },
+  modalButtonTextSecondary: {
+    color: '#333',
+    fontWeight: '600',
+  },
+  modalButtonTextPrimary: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+});
   appointmentText: { fontSize: 13, color: '#fff', textAlign: 'center', fontWeight: '500' },
 });
+

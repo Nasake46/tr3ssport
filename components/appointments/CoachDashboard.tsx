@@ -11,8 +11,9 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { auth, firestore } from '@/firebase';
-import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, where, getDocs, query } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
+import { updateParticipantStatus } from '../../services/appointmentService';
 
 // Types pour les rendez-vous
 interface Appointment {
@@ -26,9 +27,11 @@ interface Appointment {
   date: Date;
   status: 'pending' | 'accepted' | 'refused';
   createdAt: Date;
-  decisions: { [coachId: string]: CoachDecision };
+  // decisions supprimé (legacy)
   clientName?: string;
   clientEmail?: string;
+  coachParticipants: { id:string; userId?:string; status:string; }[];
+  globalStatus?: string;
 }
 
 interface CoachDecision {
@@ -139,41 +142,35 @@ export default function CoachDashboard() {
       const appointmentsList: Appointment[] = [];
       
       for (const docSnapshot of snapshot.docs) {
-        const data = docSnapshot.data();
-        
-        // Récupérer les informations du client
-        let clientName = 'Utilisateur inconnu';
-        let clientEmail = '';
-        
+        const raw:any = docSnapshot.data() as any; // typage assoupli
+        let coachParticipants:any[] = [];
         try {
-          const clientDocRef = doc(firestore, 'users', data.createdBy);
+          const partsSnap = await getDocs(query(collection(firestore,'appointmentParticipants'), where('appointmentId','==', docSnapshot.id), where('role','==','coach')));
+          coachParticipants = partsSnap.docs.map(d=>{ const pd:any = d.data(); return { id:d.id, ...pd }; });
+        } catch(e){ console.warn('⚠️ COACH DASHBOARD - participants coach load fail', e); }
+        let clientName = 'Utilisateur inconnu'; let clientEmail='';
+        try {
+          const clientDocRef = doc(firestore, 'users', raw.createdBy);
           const clientDoc = await getDoc(clientDocRef);
-          
-          if (clientDoc.exists()) {
-            const clientData = clientDoc.data() as any;
-            clientName = `${clientData.firstName || ''} ${clientData.lastName || ''}`.trim() || clientData.email?.split('@')[0] || 'Utilisateur';
-            clientEmail = clientData.email || '';
-          }
-        } catch (error) {
-          console.warn('⚠️ Impossible de récupérer les données client:', error);
-        }
-
+          if (clientDoc.exists()) { const cd:any=clientDoc.data(); clientName = `${cd.firstName||''} ${cd.lastName||''}`.trim() || cd.email?.split('@')[0] || 'Utilisateur'; clientEmail = cd.email||''; }
+        } catch {}
         const appointment: Appointment = {
           id: docSnapshot.id,
-          type: data.type,
-          createdBy: data.createdBy,
-          coachIds: data.coachIds || [],
-          sessionType: data.sessionType || '',
-          location: data.location || '',
-          description: data.description || '',
-          date: data.date?.toDate() || new Date(),
-          status: data.status || 'pending',
-          createdAt: data.createdAt?.toDate() || new Date(),
-          decisions: data.decisions || {},
+          type: raw.type,
+          createdBy: raw.createdBy,
+          coachIds: raw.coachIds || [],
+          sessionType: raw.sessionType || '',
+          location: raw.location || '',
+          description: raw.description || '',
+          date: raw.date?.toDate() || new Date(),
+          // status sera dérivé ci-dessous (status ou fallback globalStatus)
+          createdAt: raw.createdAt?.toDate() || new Date(),
           clientName,
-          clientEmail
+          clientEmail,
+          coachParticipants,
+          status: (raw as any).status || raw.globalStatus || 'pending',
+          globalStatus: raw.globalStatus
         };
-
         appointmentsList.push(appointment);
       }
 
@@ -186,9 +183,12 @@ export default function CoachDashboard() {
       // Calculer les statistiques
       const newStats = {
         total: appointmentsList.length,
-        pending: appointmentsList.filter(apt => !apt.decisions[currentUser?.uid || '']).length,
-        accepted: appointmentsList.filter(apt => apt.decisions[currentUser?.uid || '']?.status === 'accepted').length,
-        refused: appointmentsList.filter(apt => apt.decisions[currentUser?.uid || '']?.status === 'refused').length
+        pending: appointmentsList.filter(apt => {
+          const me = apt.coachParticipants.find(p=>p.userId===currentUser?.uid);
+          return !me || me.status==='pending';
+        }).length,
+        accepted: appointmentsList.filter(apt => apt.coachParticipants.find(p=>p.userId===currentUser?.uid && p.status==='accepted')).length,
+        refused: appointmentsList.filter(apt => apt.coachParticipants.find(p=>p.userId===currentUser?.uid && p.status==='declined')).length
       };
       setStats(newStats);
       
@@ -210,28 +210,15 @@ export default function CoachDashboard() {
     if (filterStatus === 'all') return appointments;
     
     return appointments.filter(appointment => {
-      const myDecision = appointment.decisions[currentUser?.uid || ''];
-      
+      const me = appointment.coachParticipants.find(p=>p.userId===currentUser?.uid);
+      const myStatus = me?.status || 'pending';
       switch (filterStatus) {
-        case 'pending':
-          return !myDecision;
-        case 'accepted':
-          return myDecision?.status === 'accepted';
-        case 'refused':
-          return myDecision?.status === 'refused';
-        default:
-          return true;
+        case 'pending': return myStatus==='pending';
+        case 'accepted': return myStatus==='accepted';
+        case 'refused': return myStatus==='declined';
+        default: return true;
       }
     });
-  };
-
-  const getAppointmentStatus = (appointment: Appointment) => {
-    const myDecision = appointment.decisions[currentUser?.uid || ''];
-    
-    if (!myDecision) return 'En attente';
-    if (myDecision.status === 'accepted') return 'Accepté';
-    if (myDecision.status === 'refused') return 'Refusé';
-    return 'En attente';
   };
 
   const getStatusText = (appointment: Appointment) => {
@@ -245,36 +232,27 @@ export default function CoachDashboard() {
       return 'Terminé';
     }
     
-    const myDecision = appointment.decisions[currentUser?.uid || ''];
-    
-    if (!myDecision) return 'En attente';
-    if (myDecision.status === 'accepted') return 'Accepté';
-    if (myDecision.status === 'refused') return 'Refusé';
+    const me = appointment.coachParticipants.find(p=>p.userId===currentUser?.uid);
+    const myStatus = me?.status || 'pending';
+    if (myStatus === 'accepted') return 'Accepté';
+    if (myStatus === 'declined') return 'Refusé';
     return 'En attente';
   };
 
   const getStatusColor = (appointment: Appointment) => {
-    // Vérifier si le rendez-vous est passé
-    const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
-    const appointmentDate = new Date(appointment.date);
-    appointmentDate.setHours(0, 0, 0, 0);
-    
-    if (appointmentDate < currentDate) {
-      return '#95a5a6'; // Gris pour rendez-vous passés/terminés
-    }
-    
-    const myDecision = appointment.decisions[currentUser?.uid || ''];
-    
-    if (!myDecision) return '#f39c12';
-    if (myDecision.status === 'accepted') return '#27ae60';
-    if (myDecision.status === 'refused') return '#e74c3c';
+    const currentDate = new Date(); currentDate.setHours(0,0,0,0);
+    const appointmentDate = new Date(appointment.date); appointmentDate.setHours(0,0,0,0);
+    if (appointmentDate < currentDate) return '#95a5a6';
+    const me = appointment.coachParticipants.find(p=>p.userId===currentUser?.uid);
+    if (!me || me.status==='pending') return '#f39c12';
+    if (me.status==='accepted') return '#27ae60';
+    if (me.status==='declined') return '#e74c3c';
     return '#f39c12';
   };
 
   const getResponsesCount = (appointment: Appointment) => {
     const totalCoaches = appointment.coachIds.length;
-    const respondedCoaches = Object.keys(appointment.decisions).length;
+    const respondedCoaches = appointment.coachParticipants.filter(p=>p.status!=='pending').length;
     return `${respondedCoaches}/${totalCoaches}`;
   };
 
@@ -289,11 +267,7 @@ export default function CoachDashboard() {
   };
 
   const handleAppointmentPress = (appointment: Appointment) => {
-    console.log('📋 COACH DASHBOARD - Ouverture détail RDV:', appointment.id);
-    router.push({
-      pathname: '/appointmentDetail',
-      params: { appointmentId: appointment.id }
-    });
+    router.push({ pathname: '/appointments/detail', params: { appointmentId: appointment.id } });
   };
 
   const renderFilterButtons = () => (
@@ -407,10 +381,19 @@ export default function CoachDashboard() {
         </View>
         
         <View style={styles.cardFooter}>
-          <Text style={styles.responsesText}>
-            Réponses: {responsesCount}
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color="#666" />
+          <Text style={styles.responsesText}>Réponses: {responsesCount}</Text>
+          <View style={{ flexDirection:'row', gap:8 }}>
+            <TouchableOpacity disabled={appointment.coachParticipants.find(p=>p.userId===currentUser?.uid)?.status==='accepted'} onPress={async()=>{
+              const me = appointment.coachParticipants.find(p=>p.userId===currentUser?.uid); if(!me)return; await updateParticipantStatus(me.id,'accepted'); loadAppointments();
+            }} style={[styles.actionButton,{ backgroundColor:'#27ae60', opacity: appointment.coachParticipants.find(p=>p.userId===currentUser?.uid)?.status==='accepted'?0.5:1 }]}> 
+              <Text style={styles.actionButtonText}>Accepter</Text>
+            </TouchableOpacity>
+            <TouchableOpacity disabled={appointment.coachParticipants.find(p=>p.userId===currentUser?.uid)?.status==='declined'} onPress={async()=>{
+              const me = appointment.coachParticipants.find(p=>p.userId===currentUser?.uid); if(!me)return; await updateParticipantStatus(me.id,'declined'); loadAppointments();
+            }} style={[styles.actionButton,{ backgroundColor:'#e74c3c', opacity: appointment.coachParticipants.find(p=>p.userId===currentUser?.uid)?.status==='declined'?0.5:1 }]}> 
+              <Text style={styles.actionButtonText}>Refuser</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -672,4 +655,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  actionButton:{ paddingVertical:6, paddingHorizontal:10, borderRadius:6 },
+  actionButtonText:{ color:'#fff', fontSize:12, fontWeight:'600' },
 });
